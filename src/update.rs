@@ -1,0 +1,45 @@
+use libsql::{Connection, Database, Error, Transaction, params};
+
+pub async fn update_publisher_writers(db: &Database, id: &str, pro_code: i64) -> Result<(), Error> {
+    let conn = db.connect()?;
+    let tx = conn.transaction().await.unwrap();
+    let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
+        Ok(_) => false,
+        Err(e) => {
+            eprintln!("{:?}", e);
+            true
+        }
+    };
+    match is_err {
+        true => tx.rollback().await,
+        false => tx.commit().await,
+    }
+}
+
+async fn update_publisher_writers_inner(
+    conn: &Transaction,
+    id: &str,
+    pro_code: i64,
+) -> Result<(), libsql::Error> {
+    update_writers(conn, id, pro_code).await?;
+
+    let sql = "
+        UPDATE parties SET pro = ?
+        WHERE id = ?";
+    let stmt = conn.prepare(sql).await?;
+    stmt.execute(params![pro_code, id]).await?;
+    Ok(())
+}
+
+async fn update_writers(conn: &Connection, id: &str, pro_code: i64) -> Result<(), libsql::Error> {
+    let sql = "
+        UPDATE parties SET pro = ?
+        WHERE id IN (
+            SELECT parent_id
+            FROM writer_relations
+            WHERE parent_id = ?
+        )";
+    let stmt = conn.prepare(sql).await?;
+    stmt.execute(params![pro_code, id]).await?;
+    Ok(())
+}
