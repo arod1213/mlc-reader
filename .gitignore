@@ -1,0 +1,5 @@
+/target
+*.codex
+*.env
+*.db
+Sample Data/
