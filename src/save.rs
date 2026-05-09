@@ -55,8 +55,8 @@ fn migrate(conn: &Connection) -> Result<(), sqlite::Error> {
     Ok(())
 }
 
-pub fn migrate_and_save() {
-    let conn = sqlite::open("mlc.db").expect("failed to create db");
+pub fn migrate_and_save(db_path: &str) {
+    let conn = sqlite::open(db_path).expect("failed to create db");
     migrate(&conn).unwrap();
 
     wrap_tx(&conn, save_object::<Party>).unwrap();

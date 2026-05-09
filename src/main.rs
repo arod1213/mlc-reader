@@ -24,7 +24,7 @@ pub struct Args {
 
 #[derive(Debug, Deserialize)]
 pub struct Update {
-    pub id: String,
+    pub id: i64,
     pub pro: u64,
 }
 
@@ -37,11 +37,11 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Migrate => migrate_and_save(),
+        Command::Migrate => migrate_and_save("mlc.db"),
         Command::Update => {
             let updates: Vec<Update> = serde_json::from_reader(stdin()).unwrap();
             for update in updates {
-                update_publisher_writers(&db, &update.id, update.pro as i64)
+                update_publisher_writers(&db, update.id, update.pro as i64)
                     .await
                     .unwrap();
             }

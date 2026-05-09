@@ -1,6 +1,6 @@
 use libsql::{Connection, Database, Error, Transaction, params};
 
-pub async fn update_publisher_writers(db: &Database, id: &str, pro_code: i64) -> Result<(), Error> {
+pub async fn update_publisher_writers(db: &Database, id: i64, pro_code: i64) -> Result<(), Error> {
     let conn = db.connect()?;
     let tx = conn.transaction().await.unwrap();
     let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
@@ -18,7 +18,7 @@ pub async fn update_publisher_writers(db: &Database, id: &str, pro_code: i64) ->
 
 async fn update_publisher_writers_inner(
     conn: &Transaction,
-    id: &str,
+    id: i64,
     pro_code: i64,
 ) -> Result<(), libsql::Error> {
     update_writers(conn, id, pro_code).await?;
@@ -31,7 +31,7 @@ async fn update_publisher_writers_inner(
     Ok(())
 }
 
-async fn update_writers(conn: &Connection, id: &str, pro_code: i64) -> Result<(), libsql::Error> {
+async fn update_writers(conn: &Connection, id: i64, pro_code: i64) -> Result<(), libsql::Error> {
     let sql = "
         UPDATE parties SET pro = ?
         WHERE id IN (
