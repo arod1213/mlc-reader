@@ -1,6 +1,6 @@
-use sqlite::Connection;
+use libsql::params;
 
-pub fn assign_roles(conn: &Connection) -> Result<(), sqlite::Error> {
+pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
     let sql = "
       UPDATE parties
       SET role = CASE
@@ -30,6 +30,6 @@ pub fn assign_roles(conn: &Connection) -> Result<(), sqlite::Error> {
         ELSE NULL
       END;
         ";
-    conn.execute(sql)?;
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }

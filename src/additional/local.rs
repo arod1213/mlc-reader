@@ -1,20 +1,6 @@
-type ResType = Result<(), sqlite::Error>;
+use libsql::params;
 
-pub fn wrap_tx(conn: &sqlite::Connection, f: fn(&sqlite::Connection) -> ResType) -> ResType {
-    conn.execute("BEGIN TRANSACTION")?;
-    match f(conn) {
-        Ok(_) => {
-            conn.execute("COMMIT")?;
-            Ok(())
-        }
-        Err(e) => {
-            conn.execute("ROLLBACK")?;
-            Err(e)
-        }
-    }
-}
-
-pub fn enrich_publisher_relations(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     let sql = "
         INSERT INTO publisher_relations (parent_id, child_id)
         SELECT DISTINCT
@@ -27,11 +13,11 @@ pub fn enrich_publisher_relations(conn: &sqlite::Connection) -> Result<(), sqlit
         ON CONFLICT(parent_id, child_id) DO UPDATE
         SET occurrences = occurrences + 1;
         ";
-    conn.execute(sql)?;
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
 
-pub fn enrich_writer_relations(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+pub async fn enrich_writer_relations(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
     let sql = "
           INSERT INTO writer_relations (writer_a, writer_b)
           WITH root_writer_shares AS (
@@ -56,6 +42,6 @@ pub fn enrich_writer_relations(conn: &sqlite::Connection) -> Result<(), sqlite::
            ON CONFLICT(writer_a, writer_b) DO UPDATE
            SET occurrences = occurrences + 1;
         ";
-    conn.execute(sql)?;
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }

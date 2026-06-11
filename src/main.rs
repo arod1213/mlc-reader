@@ -1,7 +1,7 @@
 use clap::Parser;
 use cwr::models::society::SocietyCode;
 use dotenv::dotenv;
-use libsql::{Builder, Database};
+use libsql::{Builder, Connection, Database};
 use serde::Deserialize;
 use std::{
     env,
@@ -25,8 +25,7 @@ pub struct Update {
     pub pro: SocietyCode,
 }
 
-async fn handle_update<R: BufRead>(r: &mut R, db: &Database) {
-    let conn = db.connect().unwrap();
+async fn handle_update<R: BufRead>(r: &mut R, conn: &Connection) {
     for line in r.lines() {
         let Ok(line) = line else {
             continue;
@@ -34,7 +33,7 @@ async fn handle_update<R: BufRead>(r: &mut R, db: &Database) {
         let Ok(update) = serde_json::from_str::<Update>(&line) else {
             continue;
         };
-        update_publisher_writers(&conn, update.id, update.pro)
+        update_publisher_writers(conn, update.id, update.pro)
             .await
             .unwrap();
     }
@@ -56,15 +55,14 @@ async fn main() {
     let is_local = env::var("DB_MODE") == Ok("LOCAL".into());
     let db_url = env::var("DB_URL").expect("missing DB_URL");
     let db = open_db(&db_url, is_local).await.unwrap();
+    let conn = db.connect().unwrap();
 
     let args = cli::Args::parse();
     match args.command {
         cli::Command::Migrate {} => {
-            let conn = db.connect().unwrap();
             migrate_from_bwarm_dump(&conn).await;
         }
         cli::Command::Modify {} => {
-            let conn = db.connect().unwrap();
             migrate_add_ons(&conn).await.unwrap();
         }
         cli::Command::Discover { method } => {
@@ -74,26 +72,29 @@ async fn main() {
             }
         }
         cli::Command::Enrich { method } => {
-            let conn = sqlite::open(&db_url).unwrap();
-            match method {
-                cli::EnrichMode::Writer => {
-                    additional::local::wrap_tx(&conn, additional::local::enrich_writer_relations)
-                        .unwrap()
-                }
+            let tx = conn.transaction().await.unwrap();
+            let res = async {
+                match method {
+                    cli::EnrichMode::Writer => {
+                        additional::local::enrich_writer_relations(&tx).await
+                    }
 
-                cli::EnrichMode::Publisher => {
-                    additional::local::wrap_tx(&conn, additional::local::enrich_publisher_relations)
-                        .unwrap()
+                    cli::EnrichMode::Publisher => {
+                        additional::local::enrich_publisher_relations(&tx).await
+                    }
+                    cli::EnrichMode::Role => additional::create::assign_roles(&tx).await,
                 }
-                cli::EnrichMode::Role => {
-                    additional::local::wrap_tx(&conn, additional::create::assign_roles).unwrap()
-                }
+            }
+            .await;
+            match res {
+                Ok(_) => tx.commit().await.unwrap(),
+                Err(_) => tx.rollback().await.unwrap(),
             }
         }
         cli::Command::Update { path } => {
             let file = std::fs::File::open(path).unwrap();
             let mut reader = BufReader::new(file);
-            handle_update(&mut reader, &db).await
+            handle_update(&mut reader, &conn).await
         }
     }
 }
