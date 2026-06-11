@@ -1,13 +1,8 @@
-use sqlite::{Connection, Statement};
+use libsql::{Connection, Statement};
 
 pub trait BwarmEntry {
     fn filename() -> String;
-    fn migrate(conn: &Connection) -> Result<(), sqlite::Error>;
-    fn stmt<'a>(conn: &'a Connection) -> Result<Statement<'a>, sqlite::Error>;
-    fn bind(&self, stmt: &mut Statement) -> Result<(), sqlite::Error>;
-    fn insert(&self, stmt: &mut Statement) -> Result<(), sqlite::Error> {
-        self.bind(stmt)?;
-        stmt.next()?;
-        Ok(())
-    }
+    async fn migrate(conn: &Connection) -> Result<(), libsql::Error>;
+    async fn prepare(conn: &Connection) -> Result<Statement, libsql::Error>;
+    async fn insert(&self, stmt: &mut Statement) -> Result<(), libsql::Error>;
 }

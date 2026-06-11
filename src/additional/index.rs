@@ -1,22 +1,22 @@
-use sqlite::Connection;
+use libsql::{Connection, params};
 
-pub fn create_indexes(conn: &Connection) -> Result<(), sqlite::Error> {
-    create_publisher_relation_index(conn)?;
-    create_share_index(conn)?;
+pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    create_publisher_relation_index(conn).await?;
+    create_share_index(conn).await?;
     Ok(())
 }
 
-fn create_publisher_relation_index(conn: &Connection) -> Result<(), sqlite::Error> {
+async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         CREATE INDEX idx_publisher_relations_parent_occ
         ON publisher_relations (parent_id, occurrences DESC);
         CREATE INDEX idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
         ";
-    conn.execute(sql)?;
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
-fn create_share_index(conn: &Connection) -> Result<(), sqlite::Error> {
+async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         CREATE INDEX idx_shares_party_id
         ON shares(party_id);
@@ -27,7 +27,7 @@ fn create_share_index(conn: &Connection) -> Result<(), sqlite::Error> {
         CREATE INDEX idx_shares_preceding_party
         ON shares(preceding_id, party_id);
         ";
-    conn.execute(sql)?;
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
 

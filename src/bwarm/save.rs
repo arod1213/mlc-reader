@@ -1,3 +1,5 @@
+use libsql::params;
+
 use crate::bwarm::{
     interface::BwarmEntry,
     types::{Party, Release, Share, Work},
@@ -8,7 +10,7 @@ impl BwarmEntry for Release {
         "releases.tsv".into()
     }
 
-    fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS releases (
            id INTEGER PRIMARY KEY NOT NULL,
@@ -17,10 +19,11 @@ impl BwarmEntry for Release {
            distro_name TEXT NOT NULL,
            label_name TEXT NOT NULL
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 
-    fn stmt<'a>(conn: &'a sqlite::Connection) -> Result<sqlite::Statement<'a>, sqlite::Error> {
+    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
         let sql = "
         INSERT INTO shares (
            id,
@@ -29,23 +32,27 @@ impl BwarmEntry for Release {
            distro_name,
            label_name
         ) VALUES (
-           @id,
-           @title,
-           @artist_name,
-           @distro_name,
-           @label_name
+           ?1,
+           ?2,
+           ?3,
+           ?4,
+           ?5
         )";
-        conn.prepare(sql)
+        let stmt = conn.prepare(sql).await?;
+        Ok(stmt)
     }
 
-    fn bind(&self, stmt: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        stmt.bind::<&[(_, sqlite::Value)]>(&[
-            ("@id", self.id.into()),
-            ("@title", self.title.as_str().into()),
-            ("@artist_name", self.artist_name.as_str().into()),
-            ("@distro_name", self.distro_name.as_str().into()),
-            ("@label_name", self.label_name.as_str().into()),
-        ])
+    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+        _ = stmt
+            .execute(params!(
+                self.id,
+                self.title.as_str(),
+                self.artist_name.as_str(),
+                self.distro_name.as_str(),
+                self.label_name.as_str(),
+            ))
+            .await?;
+        Ok(())
     }
 }
 
@@ -54,7 +61,7 @@ impl BwarmEntry for Share {
         "musicalworkrightshares.tsv".into()
     }
 
-    fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS shares (
            id TEXT PRIMARY KEY NOT NULL,
@@ -67,10 +74,11 @@ impl BwarmEntry for Share {
            territory_code TEXT NOT NULL,
            preceding_id TEXT
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 
-    fn stmt<'a>(conn: &'a sqlite::Connection) -> Result<sqlite::Statement<'a>, sqlite::Error> {
+    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
         let sql = "
         INSERT INTO shares (
            id,
@@ -83,31 +91,34 @@ impl BwarmEntry for Share {
            territory_code,
            preceding_id
         ) VALUES (
-           @id,
-           @work_id,
-           @party_id,
-           @role,
-           @share_type,
-           @rights_type,
-           @share,
-           @territory_code,
-           @preceding_id
+           ?1,
+           ?2,
+           ?3,
+           ?4,
+           ?5,
+           ?6,
+           ?7,
+           ?8,
+           ?9
         )";
-        conn.prepare(sql)
+        conn.prepare(sql).await
     }
 
-    fn bind(&self, stmt: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        stmt.bind::<&[(_, sqlite::Value)]>(&[
-            ("@id", self.id.clone().into()),
-            ("@work_id", self.work_id.clone().into()),
-            ("@party_id", self.party_id.into()),
-            ("@role", self.role.clone().into()),
-            ("@share_type", self.share_type.clone().into()),
-            ("@rights_type", self.rights_type.clone().into()),
-            ("@share", self.share.unwrap_or_default().into()),
-            ("@territory_code", self.territory_code.clone().into()),
-            ("@preceding_id", self.preceding_id.clone().into()),
-        ])
+    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+        _ = stmt
+            .execute(params!(
+                self.id.clone(),
+                self.work_id.clone(),
+                self.party_id,
+                self.role.clone(),
+                self.share_type.clone(),
+                self.rights_type.clone(),
+                self.share.unwrap_or_default(),
+                self.territory_code.clone(),
+                self.preceding_id.clone(),
+            ))
+            .await?;
+        Ok(())
     }
 }
 impl BwarmEntry for Work {
@@ -115,7 +126,7 @@ impl BwarmEntry for Work {
         "musicalworks.tsv".into()
     }
 
-    fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS works (
            id TEXT PRIMARY KEY NOT NULL,
@@ -127,10 +138,11 @@ impl BwarmEntry for Work {
            is_arrangement INTEGER NOT NULL,
            territory TEXT
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 
-    fn stmt<'a>(conn: &'a sqlite::Connection) -> Result<sqlite::Statement<'a>, sqlite::Error> {
+    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
         let sql = "
         INSERT INTO works (
            id,
@@ -142,29 +154,32 @@ impl BwarmEntry for Work {
            is_arrangement,
            territory
         ) VALUES (
-           @id,
-           @title,
-           @duration_ms,
-           @iswc,
-           @in_dispute,
-           @alt_id,
-           @is_arrangement,
-           @territory
+           ?1,
+           ?2,
+           ?3,
+           ?4,
+           ?5,
+           ?6,
+           ?7,
+           ?8
         )";
-        conn.prepare(sql)
+        conn.prepare(sql).await
     }
 
-    fn bind(&self, stmt: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        stmt.bind::<&[(_, sqlite::Value)]>(&[
-            ("@id", self.id.clone().into()),
-            ("@title", self.title.clone().into()),
-            ("@duration_ms", self.duration_ms.into()),
-            ("@iswc", self.iswc.clone().into()),
-            ("@in_dispute", (self.in_dispute as i64).into()),
-            ("@alt_id", self.alt_id.into()),
-            ("@is_arrangement", (self.is_arrangement as i64).into()),
-            ("@territory", self.territory.clone().into()),
-        ])
+    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+        _ = stmt
+            .execute(params!(
+                self.id.clone(),
+                self.title.clone(),
+                self.duration_ms,
+                self.iswc.clone(),
+                (self.in_dispute as i64),
+                self.alt_id,
+                (self.is_arrangement as i64),
+                self.territory.clone(),
+            ))
+            .await?;
+        Ok(())
     }
 }
 
@@ -173,7 +188,7 @@ impl BwarmEntry for Party {
         "parties.tsv".into()
     }
 
-    fn stmt<'a>(conn: &'a sqlite::Connection) -> Result<sqlite::Statement<'a>, sqlite::Error> {
+    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
         let sql = "
         INSERT INTO parties (
            id,
@@ -187,37 +202,40 @@ impl BwarmEntry for Party {
            key_name,
            prefix
         ) VALUES (
-           @id,
-           @email,
-           @isni,
-           @cisac_id,
-           @dpid,
-           @ipi,
-           @contact_name,
-           @full_name,
-           @key_name,
-           @prefix
+           ?1,
+           ?2,
+           ?3,
+           ?4,
+           ?5,
+           ?6,
+           ?7,
+           ?8,
+           ?9,
+           ?10
         )
         ";
-        conn.prepare(sql)
+        conn.prepare(sql).await
     }
 
-    fn bind(&self, stmt: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
-        stmt.bind::<&[(_, sqlite::Value)]>(&[
-            ("@id", self.id.into()),
-            ("@email", self.email.clone().into()),
-            ("@isni", self.isni.clone().into()),
-            ("@cisac_id", self.cisac_id.clone().into()),
-            ("@dpid", self.dpid.clone().into()),
-            ("@ipi", self.ipi.into()),
-            ("@contact_name", self.contact_name.clone().into()),
-            ("@full_name", self.full_name.clone().into()),
-            ("@key_name", self.last_name.clone().into()),
-            ("@prefix", self.first_name.clone().into()),
-        ])
+    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+        _ = stmt
+            .execute(params!(
+                self.id,
+                self.email.as_deref(),
+                self.isni.as_deref(),
+                self.cisac_id.as_deref(),
+                self.dpid.as_deref(),
+                self.ipi,
+                self.contact_name.as_deref(),
+                self.full_name.as_str(),
+                self.last_name.as_deref(),
+                self.first_name.as_deref(),
+            ))
+            .await?;
+        Ok(())
     }
 
-    fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS parties (
            id INTEGER PRIMARY KEY NOT NULL,
@@ -231,6 +249,7 @@ impl BwarmEntry for Party {
            key_name TEXT,
            prefix TEXT
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 }

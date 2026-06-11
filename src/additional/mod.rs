@@ -1,6 +1,9 @@
+use libsql::params;
+
 pub mod create;
 mod index;
 pub mod local;
+pub mod search;
 
 pub struct PublisherRelations {
     pub parent_id: i64,
@@ -8,7 +11,7 @@ pub struct PublisherRelations {
 }
 
 impl PublisherRelations {
-    pub fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    pub async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS publisher_relations (
             parent_id INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
@@ -16,7 +19,8 @@ impl PublisherRelations {
             occurrences INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY(parent_id, child_id)
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 }
 
@@ -26,7 +30,7 @@ pub struct WriterRelations {
 }
 
 impl WriterRelations {
-    pub fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+    pub async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS writer_relations (
             writer_a INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
@@ -34,11 +38,12 @@ impl WriterRelations {
             occurrences INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY(writer_a, writer_b)
         )";
-        conn.execute(sql)
+        _ = conn.execute(sql, params!()).await?;
+        Ok(())
     }
 }
 
-fn modify_parties_migration(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+async fn modify_parties_migration(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     let sql = "
         ALTER TABLE parties
         ADD COLUMN pro INTEGER;
@@ -49,13 +54,14 @@ fn modify_parties_migration(conn: &sqlite::Connection) -> Result<(), sqlite::Err
         ALTER TABLE parties
         ADD COLUMN role TEXT;
         ";
-    conn.execute(sql)
+    _ = conn.execute(sql, params!()).await?;
+    Ok(())
 }
 
-pub fn migrate_add_ons(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     // modify_parties_migration(conn)?;
-    PublisherRelations::migrate(conn)?;
-    WriterRelations::migrate(conn)?;
-    index::create_indexes(conn)?;
+    PublisherRelations::migrate(conn).await?;
+    WriterRelations::migrate(conn).await?;
+    index::create_indexes(conn).await?;
     Ok(())
 }

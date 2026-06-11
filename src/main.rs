@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::Parser;
 use cwr::models::society::SocietyCode;
 use dotenv::dotenv;
 use libsql::{Builder, Database};
@@ -40,7 +40,7 @@ async fn handle_update<R: BufRead>(r: &mut R, db: &Database) {
     }
 }
 
-async fn db_connect(url: &str, is_local: bool) -> Result<libsql::Database, libsql::Error> {
+async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::Error> {
     match is_local {
         true => Builder::new_local(url).build().await,
         false => {
@@ -55,18 +55,27 @@ async fn main() {
     dotenv().ok();
     let is_local = env::var("DB_MODE") == Ok("LOCAL".into());
     let db_url = env::var("DB_URL").expect("missing DB_URL");
-    let db = db_connect(&db_url, is_local).await.unwrap();
+    let db = open_db(&db_url, is_local).await.unwrap();
 
     let args = cli::Args::parse();
     match args.command {
-        cli::Command::Migrate {} => migrate_from_bwarm_dump(&db_url),
-        cli::Command::Modify {} => {
-            let conn = sqlite::open(&db_url).unwrap();
-            migrate_add_ons(&conn).unwrap();
+        cli::Command::Migrate {} => {
+            let conn = db.connect().unwrap();
+            migrate_from_bwarm_dump(&conn).await;
         }
-        cli::Command::Enrich { role } => {
+        cli::Command::Modify {} => {
+            let conn = db.connect().unwrap();
+            migrate_add_ons(&conn).await.unwrap();
+        }
+        cli::Command::Discover { method } => {
+            //
+            match method {
+                cli::DiscoverMode::Writer => todo!(),
+            }
+        }
+        cli::Command::Enrich { method } => {
             let conn = sqlite::open(&db_url).unwrap();
-            match role {
+            match method {
                 cli::EnrichMode::Writer => {
                     additional::local::wrap_tx(&conn, additional::local::enrich_writer_relations)
                         .unwrap()

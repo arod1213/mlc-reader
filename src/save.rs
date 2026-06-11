@@ -1,14 +1,16 @@
 use std::{error::Error, fs::File};
 
+use libsql::{Connection, Transaction};
 use serde::de::DeserializeOwned;
-use sqlite::Connection;
 
 use crate::bwarm::{
     interface::BwarmEntry,
     types::{Party, Release, Share, Work},
 };
 
-fn save_object<T: BwarmEntry + DeserializeOwned>(conn: &Connection) -> Result<(), Box<dyn Error>> {
+async fn save_object<T: BwarmEntry + DeserializeOwned>(
+    tx: &Transaction,
+) -> Result<(), Box<dyn Error>> {
     let fullpath = dirs::download_dir().unwrap().join(T::filename());
 
     let file = File::open(fullpath)?;
@@ -19,49 +21,42 @@ fn save_object<T: BwarmEntry + DeserializeOwned>(conn: &Connection) -> Result<()
 
     let headers = rdr.headers()?.clone();
     dbg!(&headers);
-    let mut stmt = T::stmt(conn)?;
+    let mut stmt = T::prepare(tx).await?;
     for entry in rdr.records() {
         let x = entry?;
         let obj: T = x.deserialize(Some(&headers))?;
-        obj.insert(&mut stmt)?;
-        stmt.reset()?;
+        obj.insert(&mut stmt).await?;
+        stmt.reset();
     }
     Ok(())
 }
 
-fn wrap_tx<T>(
-    conn: &Connection,
-    f: fn(&Connection) -> Result<T, Box<dyn Error>>,
-) -> Result<T, Box<dyn Error>> {
-    conn.execute("BEGIN TRANSACTION")
-        .expect("failed to start tx");
-    match f(conn) {
-        Ok(x) => {
-            conn.execute("COMMIT")?;
-            Ok(x)
-        }
-        Err(e) => {
-            conn.execute("ROLLBACK")?;
-            Err(e)
-        }
-    }
-}
-
-fn migrate(conn: &Connection) -> Result<(), sqlite::Error> {
-    Release::migrate(conn)?;
-    Party::migrate(conn)?;
-    Work::migrate(conn)?;
-    Share::migrate(conn)?;
+async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
+    Release::migrate(conn).await?;
+    Party::migrate(conn).await?;
+    Work::migrate(conn).await?;
+    Share::migrate(conn).await?;
     // conn.execute("CREATE INDEX idx_party ON parties(id)")
     Ok(())
 }
 
-pub fn migrate_from_bwarm_dump(db_path: &str) {
-    let conn = sqlite::open(db_path).expect("failed to create db");
-    migrate(&conn).unwrap();
-
-    wrap_tx(&conn, save_object::<Release>).unwrap();
-    wrap_tx(&conn, save_object::<Party>).unwrap();
-    wrap_tx(&conn, save_object::<Work>).unwrap();
-    wrap_tx(&conn, save_object::<Share>).unwrap();
+pub async fn migrate_from_bwarm_dump(conn: &Connection) {
+    migrate(conn).await.unwrap();
+    let tx = conn.transaction().await.unwrap();
+    let res = async {
+        save_object::<Release>(&tx).await?;
+        save_object::<Party>(&tx).await?;
+        save_object::<Work>(&tx).await?;
+        save_object::<Share>(&tx).await?;
+        Ok::<_, Box<dyn std::error::Error>>(())
+    }
+    .await;
+    match res {
+        Ok(_) => {
+            tx.commit().await.unwrap();
+        }
+        Err(_) => {
+            tx.rollback().await.unwrap();
+        }
+    }
 }
