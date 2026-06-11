@@ -1,5 +1,6 @@
 use libsql::{Connection, Statement};
 
+#[allow(async_fn_in_trait)]
 pub trait BwarmEntry {
     fn filename() -> String;
     async fn migrate(conn: &Connection) -> Result<(), libsql::Error>;
