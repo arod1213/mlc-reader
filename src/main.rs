@@ -52,7 +52,7 @@ async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let is_local = env::var("DB_MODE") == Ok("LOCAL".into());
+    let is_local = env::var("DB_MODE").as_deref() == Ok("LOCAL");
     let db_url = env::var("DB_URL").expect("missing DB_URL");
     let db = open_db(&db_url, is_local).await.unwrap();
     let conn = db.connect().unwrap();
