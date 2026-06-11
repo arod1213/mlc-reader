@@ -6,6 +6,7 @@ use serde::Deserialize;
 use std::{
     env,
     io::{BufRead, BufReader},
+    path::PathBuf,
 };
 
 use crate::{
@@ -35,5 +36,8 @@ pub enum Command {
         #[arg(short, long)]
         role: EnrichMode,
     },
-    Update {},
+    Update {
+        #[arg(short, long)]
+        path: PathBuf,
+    },
 }

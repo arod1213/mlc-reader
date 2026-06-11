@@ -1,12 +1,11 @@
 use cwr::models::society::SocietyCode;
-use libsql::{Connection, Database, Error, Transaction, params};
+use libsql::{Connection, Error, Transaction, params};
 
 pub async fn update_publisher_writers(
-    db: &Database,
+    conn: &Connection,
     id: i64,
     pro_code: SocietyCode,
 ) -> Result<(), Error> {
-    let conn = db.connect()?;
     let tx = conn.transaction().await.unwrap();
     let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
         Ok(_) => false,
