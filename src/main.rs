@@ -1,7 +1,9 @@
+#![warn(async_fn_in_trait)]
+
 use clap::Parser;
 use cwr::models::society::SocietyCode;
 use dotenv::dotenv;
-use libsql::{Builder, Connection, Database};
+use libsql::{Builder, Connection};
 use serde::Deserialize;
 use std::{
     env,
