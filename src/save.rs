@@ -5,7 +5,7 @@ use sqlite::Connection;
 
 use crate::bwarm::{
     interface::BwarmEntry,
-    types::{Party, Share, Work},
+    types::{Party, Release, Share, Work},
 };
 
 fn save_object<T: BwarmEntry + DeserializeOwned>(conn: &Connection) -> Result<(), Box<dyn Error>> {
@@ -48,6 +48,7 @@ fn wrap_tx<T>(
 }
 
 fn migrate(conn: &Connection) -> Result<(), sqlite::Error> {
+    Release::migrate(conn)?;
     Party::migrate(conn)?;
     Work::migrate(conn)?;
     Share::migrate(conn)?;
@@ -55,10 +56,11 @@ fn migrate(conn: &Connection) -> Result<(), sqlite::Error> {
     Ok(())
 }
 
-pub fn migrate_and_save(db_path: &str) {
+pub fn migrate_from_bwarm_dump(db_path: &str) {
     let conn = sqlite::open(db_path).expect("failed to create db");
     migrate(&conn).unwrap();
 
+    wrap_tx(&conn, save_object::<Release>).unwrap();
     wrap_tx(&conn, save_object::<Party>).unwrap();
     wrap_tx(&conn, save_object::<Work>).unwrap();
     wrap_tx(&conn, save_object::<Share>).unwrap();

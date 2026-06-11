@@ -1,6 +1,11 @@
+use cwr::models::society::SocietyCode;
 use libsql::{Connection, Database, Error, Transaction, params};
 
-pub async fn update_publisher_writers(db: &Database, id: i64, pro_code: i64) -> Result<(), Error> {
+pub async fn update_publisher_writers(
+    db: &Database,
+    id: i64,
+    pro_code: SocietyCode,
+) -> Result<(), Error> {
     let conn = db.connect()?;
     let tx = conn.transaction().await.unwrap();
     let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
@@ -19,7 +24,7 @@ pub async fn update_publisher_writers(db: &Database, id: i64, pro_code: i64) -> 
 async fn update_publisher_writers_inner(
     conn: &Transaction,
     id: i64,
-    pro_code: i64,
+    pro_code: SocietyCode,
 ) -> Result<(), libsql::Error> {
     update_writers(conn, id, pro_code).await?;
 
@@ -27,19 +32,23 @@ async fn update_publisher_writers_inner(
         UPDATE parties SET pro = ?
         WHERE id = ?";
     let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![pro_code, id]).await?;
+    stmt.execute(params![pro_code.code() as i64, id]).await?;
     Ok(())
 }
 
-async fn update_writers(conn: &Connection, id: i64, pro_code: i64) -> Result<(), libsql::Error> {
+async fn update_writers(
+    conn: &Connection,
+    id: i64,
+    pro_code: SocietyCode,
+) -> Result<(), libsql::Error> {
     let sql = "
         UPDATE parties SET pro = ?
         WHERE id IN (
             SELECT parent_id
-            FROM writer_relations
+            FROM publisher_relations
             WHERE parent_id = ?
         )";
     let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![pro_code, id]).await?;
+    stmt.execute(params![pro_code.code() as i64, id]).await?;
     Ok(())
 }

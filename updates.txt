@@ -1,0 +1,104 @@
+# TUNECORE DIGITAL MUSIC
+{ "id": 863956, "pro": "bmi" }
+
+# CD BABY ALPHA
+{ "id": 922070, "pro": "ascap" }
+
+# CD BABY BETA
+{ "id": 922071, "pro": "bmi" }
+
+# SONGTRUST BLVD
+{ "id": 853097, "pro": "bmi" }
+
+# SENTRIC MUSIC PUBLISHING
+{ "id": 628990, "pro": "prs" }
+
+# SONGTRUST AVE
+{ "id": 853096, "pro": "ascap" }
+
+# ALIBOTS
+{ "id": 4607220, "pro": "bmi" }
+
+# ALIBI GENERATOR
+{ "id": 4607209, "pro": "ascap" }
+
+# MUSERK
+{ "id": 1078183, "pro": "apra" }
+
+# BEATSTART PUBLISHING WORLDWIDE
+{ "id": 4921706, "pro": "bmi" }
+
+# TUNECORE PUBLISHING
+{ "id": 863951, "pro": "bmi" }
+
+# SMITHHOUSE PUBLISHING
+{ "id": 1154461, "pro": "ascap" }
+
+# WARNER-TAMERLANE PUBLISHING CORP.
+{ "id": 880059, "pro": "bmi" }
+
+# ALLIANCE AUDIOSPARX
+{ "id": 483865, "pro": "bmi" }
+
+# SONGS OF UNIVERSAL, INC.
+{ "id": 615191, "pro": "bmi" }
+
+# SONY/ATV TUNES LLC
+{ "id": 861339, "pro": "ascap" }
+
+# UNIVERSAL MUSIC CORP.
+{ "id": 598709, "pro": "ascap" }
+
+# DOWNTOWN DLJ SONGS LLC
+{ "id": 724685, "pro": "ascap" }
+
+# TENYOR MUSIC
+{ "id": 910354, "pro": "bmi" }
+
+# SAREGAMA MUSIC UNITED STATES
+{ "id": 522364, "pro": "bmi" }
+
+# DOWNTOWN DMP SONGS
+{ "id": 859358, "pro": "bmi" }
+
+# BMG PLATINUM SONGS
+{ "id": 752642, "pro": "bmi" }
+
+# ZACHARY NAHOME
+{ "id": 2100674, "pro": "prs" }
+
+# OLIVIA DEAN
+{ "id": 4521136, "pro": "prs" }
+
+# JESSO TOBIAS
+{ "id": 514199, "pro": "socan" }
+
+# MODERN ARTS SONGS
+{ "id": 4541938, "pro": "bmi" }
+
+# SONGS OF S10PUBLISHING
+{ "id": 6121255, "pro": "bmi" }
+
+# AVEX USA HITS
+{ "id": 6203663, "pro": "bmi" }
+
+# JASPER JAMS
+{ "id": 2721345, "pro": "bmi" }
+
+# WONDERLAND MUSIC INC
+{ "id": 718439, "pro": "bmi" }
+
+# MAGGIE CHAPMAN MUSIC
+{ "id": 888733, "pro": "bmi" }
+
+# CREATIVE PULSE MUSIC
+{ "id": 889474, "pro": "bmi" }
+
+# SONY/ATV TREE PUBLSIHING
+{ "id": 425389934, "pro": "bmi" }
+
+# MUSIC OF BIG FAMILY
+{ "id": 3150609, "pro": "bmi" }
+
+# EGG WEITZ MUSIC
+{ "id": 4541934, "pro": "bmi" }

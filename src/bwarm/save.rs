@@ -1,7 +1,53 @@
 use crate::bwarm::{
     interface::BwarmEntry,
-    types::{Party, Share, Work},
+    types::{Party, Release, Share, Work},
 };
+
+impl BwarmEntry for Release {
+    fn filename() -> String {
+        "releases.tsv".into()
+    }
+
+    fn migrate(conn: &sqlite::Connection) -> Result<(), sqlite::Error> {
+        let sql = "
+        CREATE TABLE IF NOT EXISTS releases (
+           id INTEGER PRIMARY KEY NOT NULL,
+           title TEXT NOT NULL,
+           artist_name TEXT NOT NULL,
+           distro_name TEXT NOT NULL,
+           label_name TEXT NOT NULL
+        )";
+        conn.execute(sql)
+    }
+
+    fn stmt<'a>(conn: &'a sqlite::Connection) -> Result<sqlite::Statement<'a>, sqlite::Error> {
+        let sql = "
+        INSERT INTO shares (
+           id,
+           title,
+           artist_name,
+           distro_name,
+           label_name
+        ) VALUES (
+           @id,
+           @title,
+           @artist_name,
+           @distro_name,
+           @label_name
+        )";
+        conn.prepare(sql)
+    }
+
+    fn bind(&self, stmt: &mut sqlite::Statement) -> Result<(), sqlite::Error> {
+        stmt.bind::<&[(_, sqlite::Value)]>(&[
+            ("@id", self.id.into()),
+            ("@title", self.title.as_str().into()),
+            ("@artist_name", self.artist_name.as_str().into()),
+            ("@distro_name", self.distro_name.as_str().into()),
+            ("@label_name", self.label_name.as_str().into()),
+        ])
+    }
+}
 
 impl BwarmEntry for Share {
     fn filename() -> String {

@@ -25,6 +25,20 @@ pub struct Party {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Release {
+    #[serde(rename = "#ReleaseRecordId")]
+    pub id: i64,
+    #[serde(rename = "ReleaseTitle")]
+    pub title: String,
+    #[serde(rename = "DisplayArtistName")]
+    pub artist_name: String,
+    #[serde(rename = "LabelName")]
+    pub label_name: String,
+    #[serde(rename = "DistributorName")]
+    pub distro_name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Work {
     #[serde(rename = "#MusicalWorkRecordId")]
     pub id: String,
