@@ -14,24 +14,10 @@ use crate::{
 
 mod additional;
 pub mod bwarm;
+mod cli;
 pub mod commands;
 pub mod save;
 pub mod update;
-
-#[derive(Debug, Deserialize, Clone, ValueEnum)]
-pub enum Command {
-    Migrate,
-    Modify,
-    Enrich,
-    Update,
-    WriterRelation,
-}
-
-#[derive(Debug, Parser)]
-pub struct Args {
-    #[arg(short, long)]
-    pub command: Command,
-}
 
 #[derive(Debug, Deserialize)]
 pub struct Update {
@@ -73,38 +59,31 @@ async fn main() {
     let db = db_connect(true).await.unwrap();
 
     let local_db = "mlc.db";
-    let args = Args::parse();
+    let args = cli::Args::parse();
     match args.command {
-        Command::WriterRelation => {
-            let conn = sqlite::open(local_db).unwrap();
-            commands::writer_relations(&conn, 8334710).unwrap();
-        }
-        Command::Migrate => migrate_from_bwarm_dump(local_db),
-        Command::Modify => {
+        cli::Command::Migrate {} => migrate_from_bwarm_dump(local_db),
+        cli::Command::Modify {} => {
             let conn = sqlite::open(local_db).unwrap();
             migrate_add_ons(&conn).unwrap();
         }
-        Command::Enrich => {
+        cli::Command::Enrich { role } => {
             let conn = sqlite::open(local_db).unwrap();
-            additional::local::wrap_tx(&conn, additional::local::enrich_writer_relations).unwrap();
-            // additional::local::wrap_tx(&conn, additional::create::assign_roles).unwrap();
+            match role {
+                cli::EnrichMode::Writer => {
+                    additional::local::wrap_tx(&conn, additional::local::enrich_writer_relations)
+                        .unwrap()
+                }
 
-            // match enrich_publisher_relations(&tx).await {
-            //     Ok(_) => tx.commit().await.unwrap(),
-            //     Err(e) => {
-            //         dbg!(e);
-            //         tx.rollback().await.unwrap();
-            //     }
-            // }
-            // match enrich_writer_relations(&tx).await {
-            //     Ok(_) => tx.commit().await.unwrap(),
-            //     Err(e) => {
-            //         dbg!(e);
-            //         tx.rollback().await.unwrap();
-            //     }
-            // }
+                cli::EnrichMode::Publisher => {
+                    additional::local::wrap_tx(&conn, additional::local::enrich_publisher_relations)
+                        .unwrap()
+                }
+                cli::EnrichMode::Role => {
+                    additional::local::wrap_tx(&conn, additional::create::assign_roles).unwrap()
+                }
+            }
         }
-        Command::Update => {
+        cli::Command::Update {} => {
             let file = std::fs::File::open("update2.txt").unwrap();
             let mut reader = BufReader::new(file);
             handle_update(&mut reader, &db).await
