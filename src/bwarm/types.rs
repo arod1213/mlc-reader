@@ -5,10 +5,10 @@ where
     D: Deserializer<'de>,
 {
     let res = String::deserialize(deserializer)?;
-    match res.as_str() {
+    match res.trim().to_uppercase().as_str() {
         "TRUE" => Ok(true),
         "FALSE" => Ok(false),
-        _ => return Err(de::Error::custom("invalid bool")),
+        _ => Err(de::Error::custom(format!("invalid bool {res}"))),
     }
 }
 

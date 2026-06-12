@@ -15,12 +15,12 @@ pub mod save;
 pub mod server;
 pub mod update;
 
-pub struct MlcReader{};
+pub struct MlcReader {}
 impl MlcReader {
-    pub fn search_party(&self){}
-    pub fn search_writer_relations(&self, party_id: i64){}
-    pub fn search_publisher_relations(&self, party_id: i64){}
-    pub fn audit_party_catalog(&self, party_id: i64){}
+    pub fn search_party(&self) {}
+    pub fn search_writer_relations(&self, party_id: i64) {}
+    pub fn search_publisher_relations(&self, party_id: i64) {}
+    pub fn audit_party_catalog(&self, party_id: i64) {}
 }
 
 pub fn save_remote_mlc_docs(cred: &Credential) {
