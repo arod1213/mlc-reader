@@ -25,7 +25,7 @@ impl BwarmEntry for Release {
 
     async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
         let sql = "
-        INSERT INTO shares (
+        INSERT INTO releases (
            id,
            title,
            artist_name,
@@ -131,9 +131,9 @@ impl BwarmEntry for Work {
         CREATE TABLE IF NOT EXISTS works (
            id TEXT PRIMARY KEY NOT NULL,
            title TEXT NOT NULL,
-           duration_ms REAL NOT NULL,
+           duration_ms REAL NOT NULL DEFAULT 0.0,
            iswc TEXT,
-           in_dispute INTEGER NOT NULL,
+           in_dispute INTEGER NOT NULL DEFAULT 0,
            alt_id INTEGER,
            is_arrangement INTEGER NOT NULL,
            territory TEXT
@@ -171,7 +171,7 @@ impl BwarmEntry for Work {
             .execute(params!(
                 self.id.clone(),
                 self.title.clone(),
-                self.duration_ms,
+                self.duration_ms.unwrap_or_default(),
                 self.iswc.clone(),
                 (self.in_dispute as i64),
                 self.alt_id,

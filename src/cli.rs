@@ -12,7 +12,10 @@ pub struct Args {
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Save {},
-    Migrate {},
+    Migrate {
+        #[arg(short, long)]
+        path: PathBuf,
+    },
     Modify {},
     Enrich {
         #[arg(short, long)]

@@ -8,7 +8,7 @@ use mlc_reader::{
     },
     handle_update, open_db,
     save::migrate_from_bwarm_dump,
-    save_mlc_docs,
+    save_remote_mlc_docs,
     server::Credential,
 };
 use std::{env, io::BufReader};
@@ -18,8 +18,8 @@ use cli::Command::*;
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let is_local = env::var("DB_MODE").as_deref() == Ok("LOCAL");
     let db_url = env::var("DB_URL").expect("missing DB_URL");
+    let is_local = db_url.starts_with("file:");
     let db = open_db(&db_url, is_local).await.unwrap();
     let conn = db.connect().unwrap();
 
@@ -31,10 +31,10 @@ async fn main() {
                 username: env::var("MLC_USER").expect("missing MLC_USER"),
                 pw: env::var("MLC_PW").expect("missing MLC_PW"),
             };
-            save_mlc_docs(&cred);
+            save_remote_mlc_docs(&cred);
         }
-        Migrate {} => {
-            migrate_from_bwarm_dump(&conn).await;
+        Migrate { path } => {
+            migrate_from_bwarm_dump(&conn, &path).await;
         }
         Modify {} => {
             migrate_add_ons(&conn).await.unwrap();

@@ -1,4 +1,4 @@
-use std::{error::Error, fs::File};
+use std::{error::Error, fs::File, path::Path};
 
 use libsql::{Connection, Transaction};
 use serde::de::DeserializeOwned;
@@ -10,24 +10,38 @@ use crate::bwarm::{
 
 async fn save_object<T: BwarmEntry + DeserializeOwned>(
     tx: &Transaction,
+    bwarm_dir: &Path,
 ) -> Result<(), Box<dyn Error>> {
-    let fullpath = dirs::download_dir().unwrap().join(T::filename());
+    let fullpath = bwarm_dir.join(T::filename());
 
     let file = File::open(fullpath)?;
     let mut rdr = csv::ReaderBuilder::new()
         .delimiter(b'\t')
+        .flexible(true)
         .has_headers(true)
         .from_reader(file);
-
     let headers = rdr.headers()?.clone();
-    dbg!(&headers);
+
     let mut stmt = T::prepare(tx).await?;
+    let mut sum = 0;
     for entry in rdr.records() {
-        let x = entry?;
-        let obj: T = x.deserialize(Some(&headers))?;
+        let mut x = entry?;
+        while x.len() < headers.len() {
+            x.push_field("");
+        }
+
+        let obj = match x.deserialize::<T>(Some(&headers)) {
+            Ok(x) => x,
+            Err(e) => {
+                eprintln!("{e}");
+                continue;
+            }
+        };
         obj.insert(&mut stmt).await?;
         stmt.reset();
+        sum += 1;
     }
+    println!("INSERTED {}", sum);
     Ok(())
 }
 
@@ -40,23 +54,28 @@ async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
     Ok(())
 }
 
-pub async fn migrate_from_bwarm_dump(conn: &Connection) {
-    migrate(conn).await.unwrap();
-    let tx = conn.transaction().await.unwrap();
+pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
+    migrate(conn).await.expect("failed to migrate");
+    let tx = conn
+        .transaction()
+        .await
+        .expect("failed to setup transaction");
     let res = async {
-        save_object::<Release>(&tx).await?;
-        save_object::<Party>(&tx).await?;
-        save_object::<Work>(&tx).await?;
-        save_object::<Share>(&tx).await?;
+        save_object::<Release>(&tx, bwarm_dir).await?;
+        save_object::<Party>(&tx, bwarm_dir).await?;
+        save_object::<Work>(&tx, bwarm_dir).await?;
+        save_object::<Share>(&tx, bwarm_dir).await?;
         Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;
     match res {
         Ok(_) => {
-            tx.commit().await.unwrap();
+            tx.commit().await.expect("failed to commit");
+            println!("inserted BWARM");
         }
-        Err(_) => {
-            tx.rollback().await.unwrap();
+        Err(e) => {
+            tx.rollback().await.expect("failed to rollback");
+            println!("failed: {}", e);
         }
     }
 }

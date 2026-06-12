@@ -15,7 +15,15 @@ pub mod save;
 pub mod server;
 pub mod update;
 
-pub fn save_mlc_docs(cred: &Credential) {
+pub struct MlcReader{};
+impl MlcReader {
+    pub fn search_party(&self){}
+    pub fn search_writer_relations(&self, party_id: i64){}
+    pub fn search_publisher_relations(&self, party_id: i64){}
+    pub fn audit_party_catalog(&self, party_id: i64){}
+}
+
+pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
     server::save_doc::<Release>(&sftp, &dir).unwrap();
