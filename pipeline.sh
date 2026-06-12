@@ -1,3 +1,4 @@
+cargo run -- save && \
 cargo run -- migrate && \
 cargo run -- modify && \
 cargo run -- enrich -m writer && \

@@ -11,13 +11,9 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
-    Discover {
-        #[arg(short, long)]
-        method: DiscoverMode,
-    },
+    Save {},
     Migrate {},
     Modify {},
-
     Enrich {
         #[arg(short, long)]
         method: EnrichMode,
@@ -25,6 +21,10 @@ pub enum Command {
     Update {
         #[arg(short, long)]
         path: PathBuf,
+    },
+    Discover {
+        #[arg(short, long)]
+        method: DiscoverMode,
     },
 }
 

@@ -6,8 +6,8 @@ pub mod local;
 pub mod search;
 
 pub struct PublisherRelations {
-    pub parent_id: i64,
-    pub child_id: i64,
+    // pub parent_id: i64,
+    // pub child_id: i64,
 }
 
 impl PublisherRelations {
@@ -25,8 +25,8 @@ impl PublisherRelations {
 }
 
 pub struct WriterRelations {
-    pub writer_a: i64,
-    pub writer_b: i64,
+    // pub writer_a: i64,
+    // pub writer_b: i64,
 }
 
 impl WriterRelations {
