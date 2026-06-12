@@ -1,9 +1,9 @@
 use crate::{
     bwarm::types::{Party, Release, Share, Work},
     server::Credential,
+    tis::SocietyCode,
     update::update_publisher_writers,
 };
-use cwr::models::society::SocietyCode;
 use libsql::{Builder, Connection};
 use serde::Deserialize;
 use std::{env, io::BufRead};
@@ -13,6 +13,7 @@ pub mod bwarm;
 pub mod commands;
 pub mod save;
 pub mod server;
+pub mod tis;
 pub mod update;
 
 pub struct MlcReader {}

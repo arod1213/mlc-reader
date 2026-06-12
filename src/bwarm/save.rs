@@ -65,8 +65,8 @@ impl BwarmEntry for Share {
         let sql = "
         CREATE TABLE IF NOT EXISTS shares (
            id TEXT PRIMARY KEY NOT NULL,
-           work_id TEXT NOT NULL,
-           party_id INTEGER NOT NULL,
+           work_id TEXT NOT NULL REFERENCES works(id),
+           party_id INTEGER NOT NULL REFERENCES parties(id),
            role TEXT NOT NULL,
            share_type TEXT NOT NULL,
            rights_type TEXT NOT NULL,
@@ -131,12 +131,12 @@ impl BwarmEntry for Work {
         CREATE TABLE IF NOT EXISTS works (
            id TEXT PRIMARY KEY NOT NULL,
            title TEXT NOT NULL,
-           duration_ms REAL NOT NULL DEFAULT 0.0,
+           duration_ms REAL,
            iswc TEXT,
            in_dispute INTEGER NOT NULL DEFAULT 0,
            alt_id INTEGER,
            is_arrangement INTEGER NOT NULL,
-           territory TEXT
+           territory_code INTEGER
         )";
         _ = conn.execute(sql, params!()).await?;
         Ok(())
@@ -171,12 +171,12 @@ impl BwarmEntry for Work {
             .execute(params!(
                 self.id.clone(),
                 self.title.clone(),
-                self.duration_ms.unwrap_or_default(),
+                self.duration_ms,
                 self.iswc.clone(),
                 (self.in_dispute as i64),
                 self.alt_id,
                 (self.is_arrangement as i64),
-                self.territory.clone(),
+                self.territory.map(|x| x.code() as i64),
             ))
             .await?;
         Ok(())

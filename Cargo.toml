@@ -4,9 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# cwr = { path = "/home/arod/Documents/Github/cwr-deploy/cwr-spec" }
-cwr = { path = "../cwr-spec" }
-# cwr = { path = "../cwr-deploy/cwr-spec" }
 clap = { version = "4.6.1", features = ["derive"] }
 csv = "1.4.0"
 dirs = "6.0.0"
@@ -17,3 +14,4 @@ serde_json = "1.0.149"
 sqlite = "0.37.0"
 tokio = { version = "1.52.3", features = ["full"] }
 ssh2 = "0.9.5"
+num_enum = "0.7.6"

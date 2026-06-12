@@ -1,5 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
+use crate::tis::TerritoryCode;
+
 fn named_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
     D: Deserializer<'de>,
@@ -70,7 +72,7 @@ pub struct Work {
     )]
     pub is_arrangement: bool,
     #[serde(rename = "TerritoryOfPublicDomain")]
-    pub territory: Option<String>,
+    pub territory: Option<TerritoryCode>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

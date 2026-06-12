@@ -1,5 +1,6 @@
-use cwr::models::society::SocietyCode;
 use libsql::{Connection, Error, Transaction, params};
+
+use crate::tis::SocietyCode;
 
 pub async fn update_publisher_writers(
     conn: &Connection,
@@ -25,20 +26,20 @@ async fn update_publisher_writers_inner(
     id: i64,
     pro_code: SocietyCode,
 ) -> Result<(), libsql::Error> {
-    update_writers(conn, id, pro_code).await?;
+    update_writers(conn, id, &pro_code).await?;
 
     let sql = "
         UPDATE parties SET pro = ?
         WHERE id = ?";
     let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![pro_code.code() as i64, id]).await?;
+    stmt.execute(params![pro_code as i64, id]).await?;
     Ok(())
 }
 
 async fn update_writers(
     conn: &Connection,
     id: i64,
-    pro_code: SocietyCode,
+    pro_code: &SocietyCode,
 ) -> Result<(), libsql::Error> {
     let sql = "
         UPDATE parties SET pro = ?
@@ -48,6 +49,6 @@ async fn update_writers(
             WHERE parent_id = ?
         )";
     let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![pro_code.code() as i64, id]).await?;
+    stmt.execute(params![(*pro_code) as i64, id]).await?;
     Ok(())
 }
