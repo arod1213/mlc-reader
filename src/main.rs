@@ -1,4 +1,7 @@
+mod cli;
+
 use clap::Parser;
+use cli::Command::*;
 use dotenv::dotenv;
 use mlc_reader::{
     additional::{
@@ -12,8 +15,6 @@ use mlc_reader::{
     server::Credential,
 };
 use std::{env, io::BufReader};
-mod cli;
-use cli::Command::*;
 
 #[tokio::main]
 async fn main() {
