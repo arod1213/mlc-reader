@@ -1220,8 +1220,8 @@ dependencies = [
 
 [[package]]
 name = "musicmeta"
-version = "0.1.8"
-source = "git+https://github.com/arod1213/musicmeta.git#82d6181120434762008cc0e3bb36d5ede74b8c45"
+version = "0.1.9"
+source = "git+https://github.com/arod1213/musicmeta.git#33ea8324883cfcf41d44b54918e9e4fb6fdbd649"
 dependencies = [
  "num_enum",
  "schemars",

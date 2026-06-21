@@ -1,6 +1,7 @@
 use sqlite::{Connection, State};
 
-pub fn writer_relations(conn: &Connection, id: i64) -> Result<(), sqlite::Error> {
+/// fetch writers collaborators
+pub fn get_writer_collaborators(conn: &Connection, id: i64) -> Result<(), sqlite::Error> {
     let sql = "
       SELECT DISTINCT p.id as id, p.full_name as full_name
       FROM writer_relations wr

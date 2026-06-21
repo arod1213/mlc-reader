@@ -1,11 +1,10 @@
 use libsql::{Connection, Error, Transaction, params};
-
-use crate::tis::SocietyCode;
+use musicmeta::tis::society::TisSocietyCode;
 
 pub async fn update_publisher_writers(
     conn: &Connection,
     id: i64,
-    pro_code: SocietyCode,
+    pro_code: TisSocietyCode,
 ) -> Result<(), Error> {
     let tx = conn.transaction().await.unwrap();
     let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
@@ -24,7 +23,7 @@ pub async fn update_publisher_writers(
 async fn update_publisher_writers_inner(
     conn: &Transaction,
     id: i64,
-    pro_code: SocietyCode,
+    pro_code: TisSocietyCode,
 ) -> Result<(), libsql::Error> {
     update_writers(conn, id, &pro_code).await?;
 
@@ -39,7 +38,7 @@ async fn update_publisher_writers_inner(
 async fn update_writers(
     conn: &Connection,
     id: i64,
-    pro_code: &SocietyCode,
+    pro_code: &TisSocietyCode,
 ) -> Result<(), libsql::Error> {
     let sql = "
         UPDATE parties SET pro = ?
@@ -49,6 +48,7 @@ async fn update_writers(
             WHERE parent_id = ?
         )";
     let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![(*pro_code) as i64, id]).await?;
+    stmt.execute(params![(*pro_code).clone() as i64, id])
+        .await?;
     Ok(())
 }

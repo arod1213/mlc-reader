@@ -1,6 +1,6 @@
 use serde::{Deserialize, Deserializer, Serialize, de};
 
-use crate::tis::TerritoryCode;
+use crate::types::territory::TerritoryCode;
 
 fn named_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where

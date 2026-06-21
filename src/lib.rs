@@ -1,21 +1,17 @@
 use crate::{
     bwarm::types::{Party, Release, Share, Work},
     server::Credential,
-    tis::SocietyCode,
-    update::update_publisher_writers,
 };
 use libsql::{Builder, Connection};
+use musicmeta::tis::society::TisSocietyCode;
 use serde::Deserialize;
 use std::{env, io::BufRead};
 
 pub mod additional;
 pub mod bwarm;
-pub mod commands;
-pub mod ops;
-pub mod save;
+pub mod mutations;
 pub mod server;
-pub mod tis;
-pub mod update;
+pub mod types;
 
 pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
@@ -29,7 +25,7 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
 #[derive(Debug, Deserialize)]
 pub struct Update {
     pub id: i64,
-    pub pro: SocietyCode,
+    pub pro: TisSocietyCode,
 }
 
 pub async fn handle_update<R: BufRead>(r: &mut R, conn: &Connection) {
@@ -40,7 +36,7 @@ pub async fn handle_update<R: BufRead>(r: &mut R, conn: &Connection) {
         let Ok(update) = serde_json::from_str::<Update>(&line) else {
             continue;
         };
-        update_publisher_writers(conn, update.id, update.pro)
+        mutations::society::update_publisher_writers(conn, update.id, update.pro)
             .await
             .unwrap();
     }

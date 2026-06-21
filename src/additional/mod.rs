@@ -43,21 +43,6 @@ impl WriterRelations {
     }
 }
 
-async fn modify_parties_migration(conn: &libsql::Connection) -> Result<(), libsql::Error> {
-    let sql = "
-        ALTER TABLE parties
-        ADD COLUMN pro INTEGER;
-        ALTER TABLE parties
-        ADD COLUMN mro INTEGER;
-        ALTER TABLE parties
-        ADD COLUMN sro INTEGER;
-        ALTER TABLE parties
-        ADD COLUMN role TEXT;
-        ";
-    _ = conn.execute(sql, params!()).await?;
-    Ok(())
-}
-
 pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     // modify_parties_migration(conn)?;
     PublisherRelations::migrate(conn).await?;

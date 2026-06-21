@@ -152,7 +152,7 @@ impl BwarmEntry for Work {
            in_dispute,
            alt_id,
            is_arrangement,
-           territory
+           territory_code
         ) VALUES (
            ?1,
            ?2,
@@ -199,8 +199,8 @@ impl BwarmEntry for Party {
            ipi,
            contact_name,
            full_name,
-           key_name,
-           prefix
+           first_name,
+           last_name
         ) VALUES (
            ?1,
            ?2,
@@ -244,11 +244,12 @@ impl BwarmEntry for Party {
            cisac_id TEXT,
            dpid TEXT,
            pro INTEGER,
+           role TEXT,
            ipi INTEGER,
            contact_name TEXT,
            full_name TEXT NOT NULL,
-           key_name TEXT,
-           prefix TEXT
+           first_name TEXT,
+           last_name TEXT
         )";
         _ = conn.execute(sql, params!()).await?;
         Ok(())

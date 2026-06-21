@@ -1,7 +1,7 @@
 use libsql::{Connection, params};
 use musicmeta::{ipi::IpiNameNum, tis::society::TisSocietyCode};
 
-use crate::ops::types::{Party, WriterSearch};
+use crate::types::{Party, WriterSearch};
 
 pub async fn search_party(
     conn: &Connection,
