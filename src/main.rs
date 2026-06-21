@@ -25,13 +25,21 @@ async fn main() {
     let db = open_db(&db_url, is_local).await.unwrap();
     let conn = db.connect().unwrap();
 
-    let parties = ops::query::search_party(
+    match ops::query::search_party(
         &conn,
         WriterSearch::Ipi(musicmeta::ipi::IpiNameNum(1051977450)),
     )
     .await
-    .unwrap();
-    dbg!(parties);
+    {
+        Ok(x) => {
+            dbg!(x);
+            ()
+        }
+        Err(e) => {
+            dbg!(e.to_string());
+            ()
+        }
+    }
 
     let args = cli::Args::parse();
     match args.command {

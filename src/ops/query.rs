@@ -9,8 +9,8 @@ pub async fn search_party(
 ) -> Result<Vec<Party>, libsql::Error> {
     let sql = "
     SELECT
-        ipi,
         full_name,
+        ipi,
         pro
     FROM parties
     WHERE 
@@ -33,8 +33,8 @@ pub async fn search_party(
     while let Some(row) = rows.next().await? {
         let p = Party {
             full_name: row.get(0)?,
-            pro: TisSocietyCode::try_from(row.get::<i32>(2)? as u16).ok(),
-            ipi_name_num: row.get::<i64>(1).map(|x| IpiNameNum(x as u64)).ok(),
+            ipi_name_num: row.get::<u64>(1).map(IpiNameNum).ok(),
+            pro: TisSocietyCode::try_from(row.get::<u64>(2)? as u16).ok(),
         };
         parties.push(p);
     }
