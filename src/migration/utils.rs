@@ -8,7 +8,7 @@ use crate::bwarm::{
     types::{Party, Release, Share, Work},
 };
 
-async fn save_object<T: BwarmEntry + DeserializeOwned>(
+pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
     tx: &Transaction,
     bwarm_dir: &Path,
 ) -> Result<(), Box<dyn Error>> {
@@ -45,37 +45,11 @@ async fn save_object<T: BwarmEntry + DeserializeOwned>(
     Ok(())
 }
 
-async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
     Release::migrate(conn).await?;
     Party::migrate(conn).await?;
     Work::migrate(conn).await?;
     Share::migrate(conn).await?;
     // conn.execute("CREATE INDEX idx_party ON parties(id)")
     Ok(())
-}
-
-pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
-    migrate(conn).await.expect("failed to migrate");
-    let tx = conn
-        .transaction()
-        .await
-        .expect("failed to setup transaction");
-    let res = async {
-        save_object::<Release>(&tx, bwarm_dir).await?;
-        save_object::<Party>(&tx, bwarm_dir).await?;
-        save_object::<Work>(&tx, bwarm_dir).await?;
-        save_object::<Share>(&tx, bwarm_dir).await?;
-        Ok::<_, Box<dyn std::error::Error>>(())
-    }
-    .await;
-    match res {
-        Ok(_) => {
-            tx.commit().await.expect("failed to commit");
-            println!("inserted BWARM");
-        }
-        Err(e) => {
-            tx.rollback().await.expect("failed to rollback");
-            println!("failed: {}", e);
-        }
-    }
 }

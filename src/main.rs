@@ -1,19 +1,20 @@
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
-use mlc_reader::{
-    additional::{
-        create::assign_roles,
-        local::{enrich_publisher_relations, enrich_writer_relations},
-        migrate_add_ons,
-    },
-    handle_update,
-    mutations::migrate::migrate_from_bwarm_dump,
-    open_db, save_remote_mlc_docs,
-    server::Credential,
-};
+use libsql::Builder;
+use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::{env, io::BufReader};
+
+async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::Error> {
+    match is_local {
+        true => Builder::new_local(url).build().await,
+        false => {
+            let token = env::var("DB_TOKEN").expect("missing DB_TOKEN");
+            Builder::new_remote(url.into(), token).build().await
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -32,24 +33,24 @@ async fn main() {
                 username: env::var("MLC_USER").expect("missing MLC_USER"),
                 pw: env::var("MLC_PW").expect("missing MLC_PW"),
             };
-            save_remote_mlc_docs(&cred);
+            migration::save_remote_mlc_docs(&cred);
         }
         // save MLC BWARM TSV files into DB
         Command::Migrate { path } => {
-            migrate_from_bwarm_dump(&conn, &path).await;
+            migration::migrate_from_bwarm_dump(&conn, &path).await;
         }
         // save MLC BWARM TSV files into DB
         Command::Modify {} => {
-            migrate_add_ons(&conn).await.unwrap();
+            migration::migrate_add_ons(&conn).await.unwrap();
         }
         // add relational tables and indexes in DB
         Command::Enrich { method } => {
             let tx = conn.transaction().await.unwrap();
             let res = async {
                 match method {
-                    EnrichMode::Writer => enrich_writer_relations(&tx).await,
-                    EnrichMode::Publisher => enrich_publisher_relations(&tx).await,
-                    EnrichMode::Role => assign_roles(&tx).await,
+                    EnrichMode::Writer => migration::enrich_writer_relations(&tx).await,
+                    EnrichMode::Publisher => migration::enrich_publisher_relations(&tx).await,
+                    EnrichMode::Role => migration::assign_roles(&tx).await,
                 }
             }
             .await;
@@ -62,7 +63,7 @@ async fn main() {
         Command::Update { path } => {
             let file = std::fs::File::open(path).unwrap();
             let mut reader = BufReader::new(file);
-            handle_update(&mut reader, &conn).await
+            update_pro_affiliations(&mut reader, &conn).await
         }
     }
 }
