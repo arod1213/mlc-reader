@@ -1,6 +1,6 @@
 [package]
 name = "mlc-reader"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 
 [dependencies]
@@ -11,7 +11,6 @@ dotenv = "0.15.0"
 libsql = "0.9.30"
 serde = {version = "1.0.228", features=["derive"]}
 serde_json = "1.0.149"
-sqlite = "0.37.0"
 tokio = { version = "1.52.3", features = ["full"] }
 ssh2 = "0.9.5"
 num_enum = "0.7.6"
