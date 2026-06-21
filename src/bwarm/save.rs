@@ -243,6 +243,7 @@ impl BwarmEntry for Party {
            isni TEXT,
            cisac_id TEXT,
            dpid TEXT,
+           pro INTEGER,
            ipi INTEGER,
            contact_name TEXT,
            full_name TEXT NOT NULL,

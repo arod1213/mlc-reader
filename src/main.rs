@@ -10,6 +10,7 @@ use mlc_reader::{
         migrate_add_ons,
     },
     handle_update, open_db,
+    ops::{self, types::WriterSearch},
     save::migrate_from_bwarm_dump,
     save_remote_mlc_docs,
     server::Credential,
@@ -23,6 +24,14 @@ async fn main() {
     let is_local = db_url.starts_with("file:");
     let db = open_db(&db_url, is_local).await.unwrap();
     let conn = db.connect().unwrap();
+
+    let parties = ops::query::search_party(
+        &conn,
+        WriterSearch::Ipi(musicmeta::ipi::IpiNameNum(1051977450)),
+    )
+    .await
+    .unwrap();
+    dbg!(parties);
 
     let args = cli::Args::parse();
     match args.command {
