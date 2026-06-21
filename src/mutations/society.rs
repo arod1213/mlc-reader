@@ -1,6 +1,7 @@
 use libsql::{Connection, Error, Transaction, params};
 use musicmeta::tis::society::TisSocietyCode;
 
+/// set PRO for publisher and all associated writers
 pub async fn update_publisher_writers(
     conn: &Connection,
     id: i64,

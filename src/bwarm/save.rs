@@ -228,8 +228,8 @@ impl BwarmEntry for Party {
                 self.ipi,
                 self.contact_name.as_deref(),
                 self.full_name.as_str(),
-                self.last_name.as_deref(),
                 self.first_name.as_deref(),
+                self.last_name.as_deref(),
             ))
             .await?;
         Ok(())
