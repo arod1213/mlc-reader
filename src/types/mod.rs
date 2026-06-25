@@ -13,7 +13,7 @@ pub enum WriterSearch {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Party {
-    pub id: Option<u64>,
+    pub id: u64,
     // pub full_name: String,
     pub first_name: Option<String>,
     pub last_name: String,

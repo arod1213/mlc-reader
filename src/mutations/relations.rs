@@ -75,7 +75,7 @@ pub async fn get_party_publishers(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0).ok(),
+            id: row.get::<u64>(0)?,
             first_name: first,
             last_name: last,
             ipi_name_num: row
@@ -152,7 +152,7 @@ pub async fn get_party_writers(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0).ok(),
+            id: row.get::<u64>(0)?,
             first_name: first,
             last_name: last,
             ipi_name_num: row
@@ -221,7 +221,7 @@ pub async fn get_writer_collaborators(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0).ok(),
+            id: row.get::<u64>(0)?,
             first_name: first,
             last_name: last,
             ipi_name_num: row

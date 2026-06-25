@@ -107,7 +107,7 @@ pub async fn search_parties(
     let mut v = vec![];
     while let Some(row) = rows.next().await? {
         let w = Party {
-            id: row.get::<u64>(0).ok(),
+            id: row.get::<u64>(0)?,
             first_name: row.get(1).ok(),
             last_name: row.get(2)?,
             ipi_name_num: row
