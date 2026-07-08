@@ -26,10 +26,10 @@ pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
         .await
         .expect("failed to setup transaction");
     let res = async {
-        save_object::<Release>(&tx, bwarm_dir).await?;
-        save_object::<Party>(&tx, bwarm_dir).await?;
+        // save_object::<Release>(&tx, bwarm_dir).await?;
+        // save_object::<Party>(&tx, bwarm_dir).await?;
         save_object::<Work>(&tx, bwarm_dir).await?;
-        save_object::<Share>(&tx, bwarm_dir).await?;
+        // save_object::<Share>(&tx, bwarm_dir).await?;
         Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;

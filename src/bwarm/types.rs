@@ -1,3 +1,6 @@
+use std::str::FromStr;
+
+use musicmeta::tis::territory::{TisCountryCode, TisRegionCode};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::types::territory::TerritoryCode;
@@ -72,7 +75,8 @@ pub struct Work {
     )]
     pub is_arrangement: bool,
     #[serde(rename = "TerritoryOfPublicDomain")]
-    pub territory: Option<TerritoryCode>,
+    /// String because the MLC and DDEX are idiots who cant conform to a simple standard
+    pub territory: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -92,7 +96,7 @@ pub struct Share {
     #[serde(rename = "RightSharePercentage")]
     pub share: Option<f64>,
     #[serde(rename = "TerritoryCode")]
-    pub territory_code: String,
+    pub territory: String,
     #[serde(rename = "PrecedingMusicalWorkRightShareRecordId")]
     pub preceding_id: Option<String>,
 }

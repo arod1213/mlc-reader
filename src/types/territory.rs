@@ -6,6 +6,11 @@ pub enum TerritoryCode {
     Region(TisRegionCode),
     Country(TisCountryCode),
 }
+impl Default for TerritoryCode {
+    fn default() -> Self {
+        Self::Region(TisRegionCode::default())
+    }
+}
 impl TerritoryCode {
     pub fn code(&self) -> u16 {
         match self {

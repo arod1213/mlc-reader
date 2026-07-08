@@ -71,7 +71,7 @@ impl BwarmEntry for Share {
            share_type TEXT NOT NULL,
            rights_type TEXT NOT NULL,
            share REAL NOT NULL,
-           territory_code TEXT NOT NULL,
+           territory TEXT NOT NULL,
            preceding_id TEXT
         )";
         _ = conn.execute(sql, params!()).await?;
@@ -88,7 +88,7 @@ impl BwarmEntry for Share {
            share_type,
            rights_type,
            share,
-           territory_code,
+           territory,
            preceding_id
         ) VALUES (
            ?1,
@@ -114,7 +114,7 @@ impl BwarmEntry for Share {
                 self.share_type.clone(),
                 self.rights_type.clone(),
                 self.share.unwrap_or_default(),
-                self.territory_code.clone(),
+                self.territory.clone(),
                 self.preceding_id.clone(),
             ))
             .await?;
@@ -136,7 +136,7 @@ impl BwarmEntry for Work {
            in_dispute INTEGER NOT NULL DEFAULT 0,
            alt_id INTEGER,
            is_arrangement INTEGER NOT NULL,
-           territory_code INTEGER
+           territory TEXT
         )";
         _ = conn.execute(sql, params!()).await?;
         Ok(())
@@ -152,7 +152,7 @@ impl BwarmEntry for Work {
            in_dispute,
            alt_id,
            is_arrangement,
-           territory_code
+           territory
         ) VALUES (
            ?1,
            ?2,
@@ -176,7 +176,7 @@ impl BwarmEntry for Work {
                 (self.in_dispute as i64),
                 self.alt_id,
                 (self.is_arrangement as i64),
-                self.territory.map(|x| x.code() as i64),
+                self.territory.as_deref(),
             ))
             .await?;
         Ok(())
