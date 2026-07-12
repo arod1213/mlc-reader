@@ -27,9 +27,10 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Run {} => {
+        Command::Run { name, artist } => {
             let q = WorkSearchParams {
-                title: Some("Not so Carolina".into()),
+                title: name,
+                artist,
                 ..WorkSearchParams::default()
             };
             let res = works::search_works(&conn, q).await.unwrap();
@@ -86,7 +87,12 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
-    Run {},
+    Run {
+        #[arg(short, long)]
+        name: Option<String>,
+        #[arg(short, long)]
+        artist: Option<String>,
+    },
     Save {},
     Migrate {
         #[arg(short, long)]

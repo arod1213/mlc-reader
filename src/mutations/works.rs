@@ -7,13 +7,6 @@ pub enum WorkSearch {
     Track { title: String, artist: String },
 }
 
-#[derive(Debug, Default)]
-pub struct WorkSearchParams {
-    pub iswc: Option<Iswc>,
-    pub title: Option<String>,
-    pub artist: Option<String>,
-}
-
 #[derive(Debug, Default, Serialize)]
 pub struct WorkInfo {
     pub id: String,
@@ -31,6 +24,13 @@ pub struct Release {
     pub artist_name: String,
     pub label_name: String,
     pub distro_name: String,
+}
+
+#[derive(Debug, Default)]
+pub struct WorkSearchParams {
+    pub iswc: Option<Iswc>,
+    pub title: Option<String>,
+    pub artist: Option<String>,
 }
 
 pub async fn search_works(
@@ -63,10 +63,16 @@ pub async fn search_works(
         LEFT JOIN resources rs ON rs.id = wr.resource_id
         LEFT JOIN releases r on r.id = rs.release_id
         WHERE (
-            $1::text is NULL or wk.iswc = $1::text
+            $1::text is NULL 
+            OR wk.iswc = $1::text
         )
         AND (
-            $2::text is NULL or wk.title LIKE $2::text
+            $2::text is NULL 
+            OR wk.title LIKE '%' || $2::text || '%'
+        )
+        AND (
+            $3::text is NULL 
+            OR r.artist_name LIKE '%' || $3::text || '%'
         )
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
         LIMIT 15;";
@@ -75,7 +81,8 @@ pub async fn search_works(
             sql,
             params!(
                 q.iswc.map(|x| x.to_string()),
-                q.title.map(|x| x.to_uppercase())
+                q.title.map(|x| x.to_uppercase()),
+                q.artist.map(|x| x.to_uppercase())
             ),
         )
         .await?;
