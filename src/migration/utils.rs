@@ -4,7 +4,8 @@ use libsql::{Connection, Transaction};
 use serde::de::DeserializeOwned;
 
 use crate::bwarm::{
-    interface::BwarmEntry, party::Party, release::Release, share::Share, works::Work,
+    interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
+    work_resource::WorkResource, works::Work,
 };
 
 pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
@@ -47,8 +48,10 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
 
 pub async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
     Release::migrate(conn).await?;
+    Resource::migrate(conn).await?;
     Party::migrate(conn).await?;
     Work::migrate(conn).await?;
+    WorkResource::migrate(conn).await?;
     Share::migrate(conn).await?;
     // conn.execute("CREATE INDEX idx_party ON parties(id)")
     Ok(())

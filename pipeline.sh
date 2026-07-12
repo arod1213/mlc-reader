@@ -1,5 +1,6 @@
 # cargo run -- save && \
 # cargo run -- migrate -p './Sample Data' && \
+cargo run -- migrate -p './mlc-sample' && \
 cargo run -- modify && \
 cargo run -- enrich -m writer && \
 cargo run -- enrich -m publisher # && \

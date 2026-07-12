@@ -15,25 +15,33 @@ mod utils;
 pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
-    server::save_doc::<Resource>(&sftp, &dir).unwrap();
-    server::save_doc::<Release>(&sftp, &dir).unwrap();
-    server::save_doc::<Work>(&sftp, &dir).unwrap();
-    server::save_doc::<WorkResource>(&sftp, &dir).unwrap();
-    server::save_doc::<Party>(&sftp, &dir).unwrap();
-    server::save_doc::<Share>(&sftp, &dir).unwrap();
+    server::save_doc::<Resource>(&sftp, &dir).expect("failed to save Resources");
+    server::save_doc::<Release>(&sftp, &dir).expect("failed to save Releases");
+    server::save_doc::<Work>(&sftp, &dir).expect("failed to save Works");
+    server::save_doc::<WorkResource>(&sftp, &dir).expect("failed to save WorkResources");
+    server::save_doc::<Party>(&sftp, &dir).expect("failed to save Parties");
+    server::save_doc::<Share>(&sftp, &dir).expect("failed to save Shares");
 }
 
 /// migrate DB and save TSV files into db
 pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
     migrate(conn).await.expect("failed to migrate");
+    _ = conn
+        .execute("PRAGMA foreign_keys = OFF", params!())
+        .await
+        .expect("failed to disable FKs");
+
     let tx = conn
         .transaction()
         .await
         .expect("failed to setup transaction");
+
     let res = async {
         save_object::<Release>(&tx, bwarm_dir).await?;
+        save_object::<Resource>(&tx, bwarm_dir).await?;
         save_object::<Party>(&tx, bwarm_dir).await?;
         save_object::<Work>(&tx, bwarm_dir).await?;
+        save_object::<WorkResource>(&tx, bwarm_dir).await?;
         save_object::<Share>(&tx, bwarm_dir).await?;
         Ok::<_, Box<dyn std::error::Error>>(())
     }

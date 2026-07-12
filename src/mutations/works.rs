@@ -18,7 +18,7 @@ pub struct WorkSearchParams {
 pub struct WorkInfo {
     pub id: String,
     pub title: String,
-    pub duration_ms: u64,
+    pub duration_ms: Option<f64>,
     pub iswc: Option<Iswc>,
     pub in_dispute: bool,
     pub releases: Vec<Release>,
@@ -44,24 +44,31 @@ pub async fn search_works(
             wk.duration_ms,
             wk.iswc,
             wk.in_dispute,
-            json_group_array(
-                json_object(
-                    'id', r.id, 
-                    'title', r.title, 
-                    'artist_name', r.artist_name, 
-                    'label_name', r.label_name, 
-                    'distro_name', r.distro_name
-                )
+            COALESCE(
+                json_group_array(
+                    CASE
+                        WHEN r.id IS NOT NULL THEN json_object(
+                            'id', r.id,
+                            'title', r.title,
+                            'artist_name', r.artist_name,
+                            'label_name', r.label_name,
+                            'distro_name', r.distro_name
+                        )
+                    END
+                ),
+                '[]'
             ) as releases
-
         FROM works wk
-        LEFT JOIN releases r on r.title = 'CHANGE ME'
+        LEFT JOIN work_resources wr ON wr.work_id = wk.id
+        LEFT JOIN resources rs ON rs.id = wr.resource_id
+        LEFT JOIN releases r on r.id = rs.release_id
         WHERE (
             $1::text is NULL or wk.iswc = $1::text
         )
         AND (
             $2::text is NULL or wk.title LIKE $2::text
         )
+        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
         LIMIT 15;";
     let mut rows = conn
         .query(
@@ -78,7 +85,9 @@ pub async fn search_works(
             id: row.get(0)?,
             title: row.get(1)?,
             duration_ms: row.get(2)?,
-            iswc: Iswc::new(row.get::<i64>(3)? as u64),
+            iswc: row
+                .get::<Option<String>>(3)?
+                .and_then(|s| Iswc::try_from(s).ok()),
             in_dispute: row.get(4)?,
             releases: row
                 .get::<String>(5)

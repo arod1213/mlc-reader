@@ -16,7 +16,7 @@ pub struct Resource {
     #[serde(rename = "ResourceType")]
     pub resource_type: String,
     #[serde(rename = "ISRC")]
-    pub isrc: Isrc,
+    pub isrc: Option<Isrc>,
     #[serde(rename = "Title")]
     pub title: String,
 
@@ -34,7 +34,7 @@ impl BwarmEntry for Resource {
            id TEXT PRIMARY KEY NOT NULL,
            data_provider TEXT NOT NULL,
            release_id INTEGER NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
-           isrc TEXT NOT NULL,
+           isrc TEXT,
            title TEXT NOT NULL
         )";
         _ = conn.execute(sql, params!()).await?;
@@ -66,7 +66,7 @@ impl BwarmEntry for Resource {
                 self.id.clone(),
                 self.data_provider.clone(),
                 self.release_id,
-                self.isrc.to_string(),
+                self.isrc.as_ref().map(|x| x.to_string()),
                 self.title.clone(),
             ))
             .await?;

@@ -29,7 +29,7 @@ async fn main() {
     match args.command {
         Command::Run {} => {
             let q = WorkSearchParams {
-                title: Some("DRUNK TANK".into()),
+                title: Some("Not so Carolina".into()),
                 ..WorkSearchParams::default()
             };
             let res = works::search_works(&conn, q).await.unwrap();
