@@ -1,5 +1,8 @@
 use crate::{
-    bwarm::types::{Party, Release, Share, Work},
+    bwarm::{
+        party::Party, release::Release, resource::Resource, share::Share,
+        work_resource::WorkResource, works::Work,
+    },
     migration::utils::{migrate, save_object},
     server::{self, Credential},
 };
@@ -12,8 +15,10 @@ mod utils;
 pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
+    server::save_doc::<Resource>(&sftp, &dir).unwrap();
     server::save_doc::<Release>(&sftp, &dir).unwrap();
     server::save_doc::<Work>(&sftp, &dir).unwrap();
+    server::save_doc::<WorkResource>(&sftp, &dir).unwrap();
     server::save_doc::<Party>(&sftp, &dir).unwrap();
     server::save_doc::<Share>(&sftp, &dir).unwrap();
 }
@@ -26,10 +31,10 @@ pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
         .await
         .expect("failed to setup transaction");
     let res = async {
-        // save_object::<Release>(&tx, bwarm_dir).await?;
-        // save_object::<Party>(&tx, bwarm_dir).await?;
+        save_object::<Release>(&tx, bwarm_dir).await?;
+        save_object::<Party>(&tx, bwarm_dir).await?;
         save_object::<Work>(&tx, bwarm_dir).await?;
-        // save_object::<Share>(&tx, bwarm_dir).await?;
+        save_object::<Share>(&tx, bwarm_dir).await?;
         Ok::<_, Box<dyn std::error::Error>>(())
     }
     .await;

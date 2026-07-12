@@ -4,8 +4,7 @@ use libsql::{Connection, Transaction};
 use serde::de::DeserializeOwned;
 
 use crate::bwarm::{
-    interface::BwarmEntry,
-    types::{Party, Release, Share, Work},
+    interface::BwarmEntry, party::Party, release::Release, share::Share, works::Work,
 };
 
 pub async fn save_object<T: BwarmEntry + DeserializeOwned>(

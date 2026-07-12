@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use libsql::Builder;
+use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -26,6 +27,14 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
+        Command::Run {} => {
+            let q = WorkSearchParams {
+                title: Some("DRUNK TANK".into()),
+                ..WorkSearchParams::default()
+            };
+            let res = works::search_works(&conn, q).await.unwrap();
+            dbg!(res);
+        }
         // save MLC BWARM TSV files onto disk
         Command::Save {} => {
             let cred = Credential {
@@ -77,6 +86,7 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
+    Run {},
     Save {},
     Migrate {
         #[arg(short, long)]
