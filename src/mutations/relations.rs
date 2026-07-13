@@ -212,12 +212,18 @@ pub async fn get_writer_collaborators(
     let mut v = vec![];
     while let Some(row) = rows.next().await? {
         let (first, last) = {
-            let a: Option<String> = row.get(1)?;
-            let b: String = row.get(3)?;
-            if (a.is_none() || a == Some("".into())) && b.is_empty() {
-                (None, row.get(2)?)
+            let full: String = row.get(2)?;
+            let first: Option<String> = row.get(1)?;
+            let last: Option<String> = row.get(3)?;
+
+            if let Some(last_name) = last {
+                if last_name.is_empty() {
+                    (first, full)
+                } else {
+                    (first, last_name)
+                }
             } else {
-                (a, b)
+                (first, full)
             }
         };
         let w = Party {

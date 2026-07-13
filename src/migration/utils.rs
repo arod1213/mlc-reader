@@ -1,12 +1,17 @@
 use std::{error::Error, fs::File, path::Path};
 
-use libsql::{Connection, Transaction};
+use libsql::{Connection, Transaction, params};
 use serde::de::DeserializeOwned;
 
 use crate::bwarm::{
     interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
     work_resource::WorkResource, works::Work,
 };
+
+pub async fn disable_fk(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn.execute("PRAGMA foreign_keys = OFF", params!()).await?;
+    Ok(())
+}
 
 pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
     tx: &Transaction,
@@ -46,7 +51,7 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
     Ok(())
 }
 
-pub async fn migrate(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn migrate_schema(conn: &Connection) -> Result<(), libsql::Error> {
     Release::migrate(conn).await?;
     Resource::migrate(conn).await?;
     Party::migrate(conn).await?;

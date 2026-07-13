@@ -3,13 +3,13 @@ use crate::{
         party::Party, release::Release, resource::Resource, share::Share,
         work_resource::WorkResource, works::Work,
     },
-    migration::utils::{migrate, save_object},
+    migration::utils::{disable_fk, migrate_schema, save_object},
     server::{self, Credential},
 };
 use libsql::{Connection, params};
 use std::path::Path;
 
-mod utils;
+pub mod utils;
 
 /// save TSV files from SFTP
 pub fn save_remote_mlc_docs(cred: &Credential) {
@@ -25,11 +25,9 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
 
 /// migrate DB and save TSV files into db
 pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
-    migrate(conn).await.expect("failed to migrate");
-    _ = conn
-        .execute("PRAGMA foreign_keys = OFF", params!())
-        .await
-        .expect("failed to disable FKs");
+    migrate_schema(conn).await.expect("failed to migrate");
+
+    disable_fk(conn).await.expect("failed to disable FKs");
 
     let tx = conn
         .transaction()
@@ -112,16 +110,26 @@ pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Erro
 /// save writer -> publisher and publisher -> publisher instances
 pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     let sql = "
-        INSERT INTO publisher_relations (parent_id, child_id)
-        SELECT DISTINCT
-            p.id  AS parent_id,
-            rp.id AS child_id
-        FROM parties p
-        JOIN shares s  ON s.party_id = p.id
-        JOIN shares rs ON rs.preceding_id = s.id
-        JOIN parties rp ON rp.id = rs.party_id
+        WITH relations AS (
+            SELECT
+                p.id  AS parent_id,
+                rp.id AS child_id
+            FROM parties p
+            JOIN shares s  ON s.party_id = p.id
+            JOIN shares rs ON rs.preceding_id = s.id
+            JOIN parties rp ON rp.id = rs.party_id
+        ),
+        relation_counts AS (
+            SELECT parent_id, child_id, COUNT(*) occurrences
+            FROM relations
+            GROUP BY parent_id, child_id
+        )
+        INSERT INTO publisher_relations (parent_id, child_id, occurrences)
+        SELECT parent_id, child_id, occurrences
+        FROM relation_counts
+        WHERE true
         ON CONFLICT(parent_id, child_id) DO UPDATE
-        SET occurrences = occurrences + 1;
+        SET occurrences = occurrences + excluded.occurrences;
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
@@ -130,7 +138,6 @@ pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(),
 /// save writer -> writer instances
 pub async fn enrich_writer_relations(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
     let sql = "
-          INSERT INTO writer_relations (writer_a, writer_b)
           WITH root_writer_shares AS (
               SELECT DISTINCT
                   s.work_id,
@@ -142,16 +149,25 @@ pub async fn enrich_writer_relations(conn: &libsql::Transaction) -> Result<(), l
                   WHERE rs.work_id = s.work_id
                     AND rs.preceding_id = s.id
               )
+          ),
+          pairs AS (
+            SELECT a.party_id writer_a, b.party_id writer_b
+            FROM root_writer_shares a
+            JOIN root_writer_shares b
+              ON a.work_id = b.work_id
+             AND a.party_id < b.party_id
+          ),
+          pair_counts AS (
+            SELECT writer_a, writer_b, COUNT(*) occurrences
+            FROM pairs
+            GROUP BY writer_a, writer_b
           )
-          SELECT
-              a.party_id AS writer_a,
-              b.party_id AS writer_b
-          FROM root_writer_shares a
-          JOIN root_writer_shares b
-            ON a.work_id = b.work_id
-           AND a.party_id < b.party_id
-           ON CONFLICT(writer_a, writer_b) DO UPDATE
-           SET occurrences = occurrences + 1;
+          INSERT INTO writer_relations (writer_a, writer_b, occurrences)
+          SELECT writer_a, writer_b, occurrences
+          FROM pair_counts
+          WHERE true
+          ON CONFLICT(writer_a, writer_b) DO UPDATE
+          SET occurrences = occurrences + excluded.occurrences;
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
@@ -222,6 +238,9 @@ async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
 
         CREATE INDEX idx_shares_preceding_party
         ON shares(preceding_id, party_id);
+
+        CREATE INDEX idx_shares_work_preceeding_shares
+        ON shares(work_id, preceding_id);
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())

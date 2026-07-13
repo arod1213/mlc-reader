@@ -1,6 +1,8 @@
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use libsql::Builder;
+use mlc_reader::migration::utils::disable_fk;
+use mlc_reader::mutations::relations;
 use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use serde::Deserialize;
@@ -27,7 +29,13 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Run { name, artist } => {
+        Command::Relation { id } => {
+            let res = relations::get_writer_collaborators(&conn, id, 0)
+                .await
+                .unwrap();
+            dbg!(res);
+        }
+        Command::FindWork { name, artist } => {
             let q = WorkSearchParams {
                 title: name,
                 artist,
@@ -55,6 +63,8 @@ async fn main() {
         }
         // add relational tables and indexes in DB
         Command::Enrich { method } => {
+            disable_fk(&conn).await.expect("failed to disable FKs");
+
             let tx = conn.transaction().await.unwrap();
             let res = async {
                 match method {
@@ -65,8 +75,14 @@ async fn main() {
             }
             .await;
             match res {
-                Ok(_) => tx.commit().await.unwrap(),
-                Err(_) => tx.rollback().await.unwrap(),
+                Ok(_) => {
+                    eprintln!("insert succeeded");
+                    tx.commit().await.unwrap()
+                }
+                Err(e) => {
+                    eprintln!("failed to insert: {}", e);
+                    tx.rollback().await.unwrap()
+                }
             }
         }
         // update PRO affiliation for parties from JSONL doc
@@ -87,11 +103,15 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
-    Run {
+    FindWork {
         #[arg(short, long)]
         name: Option<String>,
         #[arg(short, long)]
         artist: Option<String>,
+    },
+    Relation {
+        #[arg(short, long)]
+        id: i64,
     },
     Save {},
     Migrate {
