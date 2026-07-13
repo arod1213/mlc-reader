@@ -69,36 +69,41 @@ pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Er
 pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     create_publisher_relation_index(conn).await?;
     create_share_index(conn).await?;
+    create_relation_indexes(conn).await?;
     Ok(())
 }
 
 /// indicate whether a party is primarily a writer / publisher
 pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
     let sql = "
-        WITH writer_occurrences AS (
-          SELECT COUNT(*) as count
+    WITH role_counts AS (
+        SELECT
+          id,
+          COALESCE(writer_count, 0) AS writer_count,
+          COALESCE(publisher_count, 0) AS publisher_count
+        FROM parties
+        LEFT JOIN (
+          SELECT child_id AS id, SUM(occurrences) AS writer_count
           FROM publisher_relations
-          WHERE child_id = parties.id
-        ),
-        publisher_occurrences AS (
-          SELECT COUNT(*) as count
-          FROM publisher_relations
-          WHERE parent_id = parties.id
-        )
-        UPDATE parties
-        SET role = CASE
-            WHEN 
-                ((SELECT count FROM writer_occurrences) > (SELECT count FROM publisher_occurrences))
-            THEN 'writer'
-            WHEN 
-                ((SELECT count FROM writer_occurrences) < (SELECT count FROM publisher_occurrences))
-            THEN 'publisher'
-            WHEN 
-                ((SELECT count FROM writer_occurrences) = (SELECT count FROM publisher_occurrences))
-            THEN 'both'
-            ELSE NULL
-        END;
-        ";
+          GROUP BY child_id
+    ) w USING (id)
+    LEFT JOIN (
+      SELECT parent_id AS id, SUM(occurrences) AS publisher_count
+      FROM publisher_relations
+      GROUP BY parent_id
+    ) p USING (id)
+    )
+    UPDATE parties
+    SET role = (
+    SELECT CASE
+      WHEN writer_count > publisher_count THEN 'writer'
+      WHEN writer_count < publisher_count THEN 'publisher'
+      WHEN writer_count = publisher_count AND writer_count > 0 THEN 'both'
+      ELSE NULL
+    END
+    FROM role_counts
+    WHERE role_counts.id = parties.id
+    );";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
@@ -219,6 +224,15 @@ async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql
         ON publisher_relations (parent_id, occurrences DESC);
         CREATE INDEX idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
+        ";
+    _ = conn.execute(sql, params!()).await?;
+    Ok(())
+}
+
+async fn create_relation_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    let sql = "
+    CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
+    ON publisher_relations (child_id, occurrences DESC);
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
