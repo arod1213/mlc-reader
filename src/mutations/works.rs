@@ -15,7 +15,7 @@ pub struct PartyInfo {
     pub full_name: String,
     pub ipi: Option<IpiNameNum>,
     pub pro: Option<TisSocietyCode>,
-    pub share: Share,
+    pub shares: Vec<Share>,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -25,8 +25,8 @@ pub struct Share {
     pub share_type: String,
     pub rights_type: String,
     pub share: f64,
+    pub preceding_id: Option<String>,
     // pub territory: String,
-    // pub preceding_id: String,
 }
 
 #[derive(Debug, Default, Serialize)]
@@ -209,11 +209,21 @@ pub async fn get_works_parties(
             p.full_name,
             p.ipi,
             p.pro,
-            s.id as share_id,
-            s.role,
-            s.share_type,
-            s.rights_type,
-            s.share
+            COALESCE(
+                json_group_array(
+                    CASE
+                        WHEN s.id IS NOT NULL THEN json_object(
+                            'id', s.id,
+                            'role', s.role,
+                            'share_type', s.share_type,
+                            'rights_type', s.rights_type,
+                            'share', s.share,
+                            'preceding_id', s.preceding_id
+                        )
+                    END
+                ),
+                '[]'
+            ) as party_shares
         FROM parties p
         JOIN shares s on s.party_id = p.id
         LEFT JOIN works wk on wk.id = s.work_id
@@ -236,13 +246,11 @@ pub async fn get_works_parties(
                 .get::<i32>(4)
                 .ok()
                 .and_then(|x| TisSocietyCode::try_from(x as u16).ok()),
-            share: Share {
-                id: row.get(5)?,
-                role: row.get(6)?,
-                share_type: row.get(7)?,
-                rights_type: row.get(8)?,
-                share: row.get(9)?,
-            },
+            shares: row
+                .get::<String>(5)
+                .ok()
+                .and_then(|s| serde_json::from_str::<Vec<Share>>(&s).ok())
+                .unwrap_or_default(),
         };
         match v.get_mut(&work_id) {
             Some(entry) => entry.push(p),

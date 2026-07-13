@@ -8,6 +8,7 @@ pub mod migration;
 pub mod mutations;
 pub mod server;
 pub mod types;
+pub mod validation;
 
 #[derive(Debug, Deserialize)]
 pub struct Update {
