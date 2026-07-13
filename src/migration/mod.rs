@@ -69,7 +69,8 @@ pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Er
 pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     create_publisher_relation_index(conn).await?;
     create_share_index(conn).await?;
-    create_relation_indexes(conn).await?;
+    create_relation_index(conn).await?;
+    create_work_resource_index(conn).await?;
     Ok(())
 }
 
@@ -229,7 +230,16 @@ async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql
     Ok(())
 }
 
-async fn create_relation_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+async fn create_work_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
+    let sql = "
+        CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource
+        ON work_resources(work_id, resource_id);
+        ";
+    _ = conn.execute(sql, params!()).await?;
+    Ok(())
+}
+
+async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
     CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
     ON publisher_relations (child_id, occurrences DESC);

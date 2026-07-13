@@ -29,6 +29,10 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
+        Command::GetWork { id } => {
+            let res = works::get_works(&conn, &[id]).await.unwrap();
+            dbg!(res);
+        }
         Command::Relation { id } => {
             let res = relations::get_writer_collaborators(&conn, id, 0)
                 .await
@@ -103,6 +107,10 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
+    GetWork {
+        #[arg(short, long)]
+        id: String,
+    },
     FindWork {
         #[arg(short, long)]
         name: Option<String>,
