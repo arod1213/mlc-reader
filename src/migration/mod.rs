@@ -261,6 +261,9 @@ async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
 
         CREATE INDEX idx_shares_work_preceeding_shares
         ON shares(work_id, preceding_id);
+
+        CREATE INDEX IF NOT EXISTS idx_shares_work_party
+        ON shares(work_id, party_id);
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())

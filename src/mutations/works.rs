@@ -204,7 +204,7 @@ pub async fn get_works_parties(
     let ids_json = serde_json::json!(ids).to_string();
     let sql = "
         SELECT 
-            wk.id as work_id, 
+            s.work_id as work_id, 
             p.id as party_id,
             p.full_name,
             p.ipi,
@@ -224,10 +224,10 @@ pub async fn get_works_parties(
                 ),
                 '[]'
             ) as party_shares
-        FROM parties p
-        JOIN shares s on s.party_id = p.id
-        LEFT JOIN works wk on wk.id = s.work_id
-        WHERE wk.id IN (SELECT value FROM json_each(?1))
+        FROM shares s
+        JOIN parties p ON p.id = s.party_id
+        WHERE s.work_id IN (SELECT value FROM json_each(?1))
+        GROUP BY s.work_id, p.id, p.full_name, p.ipi, p.pro
         LIMIT 15;";
 
     let mut rows = conn.query(sql, params!(ids_json)).await?;
