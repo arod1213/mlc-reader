@@ -91,14 +91,14 @@ pub async fn search_works(
         )
         AND (
             $2::text is NULL 
-            OR wk.title LIKE '%' || $2::text || '%'
+            OR wk.title LIKE $2::text
         )
         AND (
             $3::text is NULL 
-            OR r.artist_name LIKE '%' || $3::text || '%'
+            OR r.artist_name LIKE $3::text || '%'
         )
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
-        LIMIT 15;";
+        LIMIT 10;";
     let mut rows = conn
         .query(
             sql,
