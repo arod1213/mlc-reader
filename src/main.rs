@@ -5,6 +5,7 @@ use mlc_reader::migration::utils::disable_fk;
 use mlc_reader::mutations::relations;
 use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
+use musicmeta::ipi::IpiNameNum;
 use serde::Deserialize;
 use std::path::PathBuf;
 use std::{env, io::BufReader};
@@ -37,16 +38,19 @@ async fn main() {
             let res = relations::get_writer_collaborators(&conn, id, 0)
                 .await
                 .unwrap();
-            dbg!(res);
+            println!("{:?}", res);
         }
         Command::FindWork { name, artist } => {
             let q = WorkSearchParams {
                 title: name,
                 artist,
+                party_ipi: Some(IpiNameNum(1051977352)),
+                offset: 0,
+                limit: 10,
                 ..WorkSearchParams::default()
             };
-            let res = works::search_works(&conn, q).await.unwrap();
-            dbg!(res);
+            let res = works::search_works(&conn, q, true).await.unwrap();
+            println!("{:?}", res);
         }
         // save MLC BWARM TSV files onto disk
         Command::Save {} => {

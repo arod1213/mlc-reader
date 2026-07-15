@@ -54,11 +54,15 @@ pub struct WorkSearchParams {
     pub iswc: Option<Iswc>,
     pub title: Option<String>,
     pub artist: Option<String>,
+    pub party_ipi: Option<IpiNameNum>,
+    pub limit: usize,
+    pub offset: usize,
 }
 
 pub async fn search_works(
     conn: &Connection,
     q: WorkSearchParams,
+    is_deep: bool,
 ) -> Result<Vec<WorkInfo>, libsql::Error> {
     let sql = "
         SELECT 
@@ -97,37 +101,61 @@ pub async fn search_works(
             $3::text is NULL 
             OR r.artist_name LIKE $3::text || '%'
         )
+        AND (
+            $4::bigint is NULL
+            OR EXISTS (
+                SELECT s.id 
+                FROM shares s 
+                JOIN parties p on p.id = s.party_id  
+                WHERE s.work_id = wk.id AND p.ipi = $4::bigint
+            )
+        )
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
-        LIMIT 10;";
+        LIMIT $5;
+        OFFSET $6;";
     let mut rows = conn
         .query(
             sql,
             params!(
                 q.iswc.map(|x| x.to_string()),
                 q.title.map(|x| x.to_uppercase()),
-                q.artist.map(|x| x.to_uppercase())
+                q.artist.map(|x| x.to_uppercase()),
+                q.party_ipi.map(|x| x.0 as i64),
+                q.limit as i64,
+                (q.offset * q.limit) as i64,
             ),
         )
         .await?;
-    let mut v = vec![];
+    let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
     while let Some(row) = rows.next().await? {
-        v.push(WorkInfo {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            duration_ms: row.get(2)?,
-            iswc: row
-                .get::<Option<String>>(3)?
-                .and_then(|s| Iswc::try_from(s).ok()),
-            in_dispute: row.get(4)?,
-            parties: vec![],
-            releases: row
-                .get::<String>(5)
-                .ok()
-                .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
-                .unwrap_or_default(),
-        });
+        let work_id: String = row.get(0)?;
+        works_by_id.insert(
+            work_id.clone(),
+            WorkInfo {
+                id: work_id,
+                title: row.get(1)?,
+                duration_ms: row.get(2)?,
+                iswc: row
+                    .get::<Option<String>>(3)?
+                    .and_then(|s| Iswc::try_from(s).ok()),
+                in_dispute: row.get(4)?,
+                parties: vec![],
+                releases: row
+                    .get::<String>(5)
+                    .ok()
+                    .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
+                    .unwrap_or_default(),
+            },
+        );
     }
-    Ok(v)
+    if is_deep {
+        let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        for (id, work) in works_by_id.iter_mut() {
+            work.parties = parties_by_work.remove(id).unwrap_or_default();
+        }
+    }
+    Ok(works_by_id.into_values().collect())
 }
 
 pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo>, libsql::Error> {
