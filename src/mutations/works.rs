@@ -104,15 +104,15 @@ pub async fn search_works(
         AND (
             $4::bigint is NULL
             OR EXISTS (
-                SELECT s.id 
+                SELECT 1
                 FROM shares s 
                 JOIN parties p on p.id = s.party_id  
-                WHERE s.work_id = wk.id AND p.ipi = $4::bigint
+                WHERE s.work_id = wk.id 
+                    AND p.ipi = $4::bigint
             )
         )
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
-        LIMIT $5;
-        OFFSET $6;";
+        LIMIT $5 OFFSET $6;";
     let mut rows = conn
         .query(
             sql,
@@ -255,8 +255,7 @@ pub async fn get_works_parties(
         FROM shares s
         JOIN parties p ON p.id = s.party_id
         WHERE s.work_id IN (SELECT value FROM json_each(?1))
-        GROUP BY s.work_id, p.id, p.full_name, p.ipi, p.pro
-        LIMIT 15;";
+        GROUP BY s.work_id, p.id, p.full_name, p.ipi, p.pro";
 
     let mut rows = conn.query(sql, params!(ids_json)).await?;
 

@@ -40,17 +40,18 @@ async fn main() {
                 .unwrap();
             println!("{:?}", res);
         }
-        Command::FindWork { name, artist } => {
+        Command::FindWork { .. } => {
             let q = WorkSearchParams {
-                title: name,
-                artist,
+                // title: name,
+                // artist,
                 party_ipi: Some(IpiNameNum(1051977352)),
                 offset: 0,
                 limit: 10,
                 ..WorkSearchParams::default()
             };
             let res = works::search_works(&conn, q, true).await.unwrap();
-            println!("{:?}", res);
+            // println!("{:?}", res);
+            dbg!(res);
         }
         // save MLC BWARM TSV files onto disk
         Command::Save {} => {
