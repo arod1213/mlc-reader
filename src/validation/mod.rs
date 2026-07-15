@@ -1,4 +1,4 @@
-use crate::{mutations::works::WorkInfo, types::Party};
+use crate::mutations::works::WorkInfo;
 
 pub enum WorkError {
     Overclaim(f64),
@@ -15,9 +15,16 @@ pub fn validate_work(work: WorkInfo) -> Vec<WorkError> {
     if work.in_dispute {
         errors.push(WorkError::InDispute);
     }
-    // nest parties into hierachies
-    // writer -> vec<Publisher>
-    // sum shares based on writer?
+    let share_total = work.parties.iter().fold(0.0, |acc, x| {
+        x.shares.iter().map(|x| x.share).sum::<f64>() + acc
+    });
+
+    // tolerance 0.5
+    if share_total > 100.5 {
+        errors.push(WorkError::Overclaim(share_total));
+    } else if share_total < 99.5 {
+        errors.push(WorkError::Underclaim(share_total));
+    }
 
     errors
 }
