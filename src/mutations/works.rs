@@ -70,7 +70,7 @@ pub async fn search_works(
           FROM works wk
           WHERE 1 = 1
             AND (?1 IS NULL OR wk.iswc = ?1)
-            AND (?2 IS NULL OR wk.title LIKE ?2)
+            AND (?2 IS NULL OR wk.title = ?2)
             AND (
               ?3 IS NULL OR EXISTS (
                 SELECT 1
@@ -78,7 +78,7 @@ pub async fn search_works(
                 JOIN resources rs ON rs.id = wr.resource_id
                 JOIN releases r ON r.id = rs.release_id
                 WHERE wr.work_id = wk.id
-                  AND r.artist_name LIKE ?3 || '%'
+                  AND r.artist_name = ?3
               )
             )
             AND (

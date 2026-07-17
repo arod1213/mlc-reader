@@ -245,6 +245,9 @@ async fn create_work_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource
         ON work_resources(work_id, resource_id);
+
+        CREATE INDEX IF NOT EXISTS idx_works_title ON works(title);
+        CREATE INDEX IF NOT EXISTS idx_works_iswc ON works(iswc);
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())

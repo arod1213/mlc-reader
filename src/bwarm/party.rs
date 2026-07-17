@@ -1,5 +1,6 @@
 use libsql::params;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::bwarm::interface::BwarmEntry;
 
@@ -45,36 +46,46 @@ impl BwarmEntry for Party {
            full_name,
            first_name,
            last_name
-        ) VALUES (
-           ?1,
-           ?2,
-           ?3,
-           ?4,
-           ?5,
-           ?6,
-           ?7,
-           ?8,
-           ?9,
-           ?10
         )
-        ";
+        SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.email'),
+           json_extract(value, '$.isni'),
+           json_extract(value, '$.cisac_id'),
+           json_extract(value, '$.dpid'),
+           json_extract(value, '$.ipi'),
+           json_extract(value, '$.contact_name'),
+           json_extract(value, '$.full_name'),
+           json_extract(value, '$.first_name'),
+           json_extract(value, '$.last_name')
+        FROM json_each(?1)";
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_many(
+        objects: &[Self],
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), libsql::Error> {
+        let rows = objects
+            .iter()
+            .map(|party| {
+                json!({
+                    "id": party.id,
+                    "email": party.email.as_deref(),
+                    "isni": party.isni.as_deref(),
+                    "cisac_id": party.cisac_id.as_deref(),
+                    "dpid": party.dpid.as_deref(),
+                    "ipi": party.ipi,
+                    "contact_name": party.contact_name.as_deref(),
+                    "full_name": party.full_name.as_str(),
+                    "first_name": party.first_name.as_deref(),
+                    "last_name": party.last_name.as_deref(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         _ = stmt
-            .execute(params!(
-                self.id,
-                self.email.as_deref(),
-                self.isni.as_deref(),
-                self.cisac_id.as_deref(),
-                self.dpid.as_deref(),
-                self.ipi,
-                self.contact_name.as_deref(),
-                self.full_name.as_str(),
-                self.first_name.as_deref(),
-                self.last_name.as_deref(),
-            ))
+            .execute(params!(serde_json::to_string(&rows).unwrap()))
             .await?;
         Ok(())
     }

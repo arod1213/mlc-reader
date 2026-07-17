@@ -1,5 +1,6 @@
 use libsql::params;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::bwarm::interface::BwarmEntry;
 
@@ -59,33 +60,44 @@ impl BwarmEntry for Share {
            share,
            territory,
            preceding_id
-        ) VALUES (
-           ?1,
-           ?2,
-           ?3,
-           ?4,
-           ?5,
-           ?6,
-           ?7,
-           ?8,
-           ?9
-        )";
+        )
+        SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.work_id'),
+           json_extract(value, '$.party_id'),
+           json_extract(value, '$.role'),
+           json_extract(value, '$.share_type'),
+           json_extract(value, '$.rights_type'),
+           json_extract(value, '$.share'),
+           json_extract(value, '$.territory'),
+           json_extract(value, '$.preceding_id')
+        FROM json_each(?1)";
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_many(
+        objects: &[Self],
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), libsql::Error> {
+        let rows = objects
+            .iter()
+            .map(|share| {
+                json!({
+                    "id": share.id.as_str(),
+                    "work_id": share.work_id.as_str(),
+                    "party_id": share.party_id,
+                    "role": share.role.as_str(),
+                    "share_type": share.share_type.as_deref(),
+                    "rights_type": share.rights_type.as_deref(),
+                    "share": share.share.unwrap_or_default(),
+                    "territory": share.territory.as_str(),
+                    "preceding_id": share.preceding_id.as_deref(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         _ = stmt
-            .execute(params!(
-                self.id.clone(),
-                self.work_id.clone(),
-                self.party_id,
-                self.role.clone(),
-                self.share_type.clone(),
-                self.rights_type.clone(),
-                self.share.unwrap_or_default(),
-                self.territory.clone(),
-                self.preceding_id.clone(),
-            ))
+            .execute(params!(serde_json::to_string(&rows).unwrap()))
             .await?;
         Ok(())
     }

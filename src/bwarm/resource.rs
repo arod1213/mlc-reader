@@ -1,6 +1,7 @@
 use libsql::params;
 use musicmeta::isrc::Isrc;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::bwarm::interface::BwarmEntry;
 
@@ -49,26 +50,37 @@ impl BwarmEntry for Resource {
            release_id,
            isrc,
            title
-        ) VALUES (
-           ?1,
-           ?2,
-           ?3,
-           ?4,
-           ?5
-        )";
+        )
+        SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.data_provider'),
+           json_extract(value, '$.release_id'),
+           json_extract(value, '$.isrc'),
+           json_extract(value, '$.title')
+        FROM json_each(?1)";
         let stmt = conn.prepare(sql).await?;
         Ok(stmt)
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_many(
+        objects: &[Self],
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), libsql::Error> {
+        let rows = objects
+            .iter()
+            .map(|resource| {
+                json!({
+                    "id": resource.id.as_str(),
+                    "data_provider": resource.data_provider.as_str(),
+                    "release_id": resource.release_id,
+                    "isrc": resource.isrc.as_ref().map(|x| x.to_string()),
+                    "title": resource.title.as_str(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         _ = stmt
-            .execute(params!(
-                self.id.clone(),
-                self.data_provider.clone(),
-                self.release_id,
-                self.isrc.as_ref().map(|x| x.to_string()),
-                self.title.clone(),
-            ))
+            .execute(params!(serde_json::to_string(&rows).unwrap()))
             .await?;
         Ok(())
     }

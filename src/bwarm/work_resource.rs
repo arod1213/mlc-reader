@@ -1,5 +1,6 @@
 use libsql::params;
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 
 use crate::bwarm::interface::BwarmEntry;
 
@@ -35,22 +36,33 @@ impl BwarmEntry for WorkResource {
            id,
            work_id,
            resource_id
-        ) VALUES (
-           ?1,
-           ?2,
-           ?3
-        )";
+        )
+        SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.work_id'),
+           json_extract(value, '$.resource_id')
+        FROM json_each(?1)";
         let stmt = conn.prepare(sql).await?;
         Ok(stmt)
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_many(
+        objects: &[Self],
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), libsql::Error> {
+        let rows = objects
+            .iter()
+            .map(|work_resource| {
+                json!({
+                    "id": work_resource.id,
+                    "work_id": work_resource.work_id.as_str(),
+                    "resource_id": work_resource.resource_id.as_str(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         _ = stmt
-            .execute(params!(
-                self.id.clone(),
-                self.work_id.clone(),
-                self.resource_id.clone(),
-            ))
+            .execute(params!(serde_json::to_string(&rows).unwrap()))
             .await?;
         Ok(())
     }

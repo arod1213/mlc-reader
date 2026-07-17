@@ -1,6 +1,7 @@
 use crate::bwarm::interface::BwarmEntry;
 use libsql::params;
 use serde::{Deserialize, Deserializer, Serialize, de};
+use serde_json::json;
 
 fn named_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
 where
@@ -70,31 +71,42 @@ impl BwarmEntry for Work {
            alt_id,
            is_arrangement,
            territory
-        ) VALUES (
-           ?1,
-           ?2,
-           ?3,
-           ?4,
-           ?5,
-           ?6,
-           ?7,
-           ?8
-        )";
+        )
+        SELECT
+           json_extract(value, '$.id'),
+           json_extract(value, '$.title'),
+           json_extract(value, '$.duration_ms'),
+           json_extract(value, '$.iswc'),
+           json_extract(value, '$.in_dispute'),
+           json_extract(value, '$.alt_id'),
+           json_extract(value, '$.is_arrangement'),
+           json_extract(value, '$.territory')
+        FROM json_each(?1)";
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_many(
+        objects: &[Self],
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), libsql::Error> {
+        let rows = objects
+            .iter()
+            .map(|work| {
+                json!({
+                    "id": work.id.as_str(),
+                    "title": work.title.as_str(),
+                    "duration_ms": work.duration_ms,
+                    "iswc": work.iswc.as_deref(),
+                    "in_dispute": work.in_dispute as i64,
+                    "alt_id": work.alt_id,
+                    "is_arrangement": work.is_arrangement as i64,
+                    "territory": work.territory.as_deref(),
+                })
+            })
+            .collect::<Vec<_>>();
+
         _ = stmt
-            .execute(params!(
-                self.id.clone(),
-                self.title.clone(),
-                self.duration_ms,
-                self.iswc.clone(),
-                (self.in_dispute as i64),
-                self.alt_id,
-                (self.is_arrangement as i64),
-                self.territory.as_deref(),
-            ))
+            .execute(params!(serde_json::to_string(&rows).unwrap()))
             .await?;
         Ok(())
     }

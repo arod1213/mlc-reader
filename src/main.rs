@@ -40,11 +40,11 @@ async fn main() {
                 .unwrap();
             dbg!(res);
         }
-        Command::FindWork { artist, name } => {
+        Command::FindWork { artist, name, ipi } => {
             let q = WorkSearchParams {
                 title: name,
                 artist,
-                // party_ipi: Some(IpiNameNum(1051977352)),
+                party_ipi: ipi,
                 offset: 0,
                 limit: 10,
                 ..WorkSearchParams::default()
@@ -116,6 +116,8 @@ pub enum Command {
         id: String,
     },
     FindWork {
+        #[arg(short, long)]
+        ipi: Option<IpiNameNum>,
         #[arg(short, long)]
         name: Option<String>,
         #[arg(short, long)]
