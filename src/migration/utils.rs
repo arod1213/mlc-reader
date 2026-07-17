@@ -13,12 +13,10 @@ pub async fn disable_fk(conn: &Connection) -> Result<(), libsql::Error> {
 }
 
 pub async fn setup_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "PRAGMA journal_mode = WAL;
-            PRAGMA synchronous = NORMAL;",
-            params!(),
-        )
+    let mut rows = conn.query("PRAGMA journal_mode = WAL", params!()).await?;
+    while rows.next().await?.is_some() {}
+
+    conn.execute("PRAGMA synchronous = NORMAL", params!())
         .await?;
     Ok(())
 }
