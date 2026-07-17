@@ -112,15 +112,21 @@ pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Erro
 }
 
 /// indicate whether a party is primarily a writer / publisher
-pub async fn add_party_averages(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
+pub async fn add_party_stats(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
     conn.execute(
-        "ALTER TABLE parties ADD COLUMN average_share REAL DEFAULT 0.0;",
+        "ALTER TABLE parties ADD COLUMN average_share REAL NOT NULL DEFAULT 0.0;",
         params!(),
     )
     .await?;
 
     conn.execute(
-        "ALTER TABLE parties ADD COLUMN work_count INTEGER DEFAULT 0",
+        "ALTER TABLE parties ADD COLUMN latest_release INTEGER",
+        params!(),
+    )
+    .await?;
+
+    conn.execute(
+        "ALTER TABLE parties ADD COLUMN work_count INTEGER NOT NULL DEFAULT 0",
         params!(),
     )
     .await?;
@@ -130,12 +136,17 @@ pub async fn add_party_averages(conn: &libsql::Transaction) -> Result<(), libsql
           SELECT
               s.party_id,
               COALESCE(AVG(s.share), 0) AS average_share,
-              COUNT(DISTINCT s.work_id) AS work_count
+              COUNT(DISTINCT s.work_id) AS work_count,
+              MAX(r.release_date) AS latest_release
           FROM shares AS s
+          LEFT JOIN work_resources wr on wr.work_id = s.work_id
+          LEFT JOIN resources rs on rs.id = wr.resource_id
+          LEFT JOIN releases r on r.id = rs.release_id
           GROUP BY s.party_id
         )
         UPDATE parties AS p
         SET
+          latest_release = (SELECT ps.latest_release FROM party_stats ps WHERE ps.party_id = p.id),
           average_share = COALESCE(
               (SELECT ps.average_share FROM party_stats ps WHERE ps.party_id = p.id),
               0

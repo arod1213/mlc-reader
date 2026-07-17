@@ -80,7 +80,7 @@ async fn main() {
                     EnrichMode::Writer => migration::enrich_writer_relations(&tx).await,
                     EnrichMode::Publisher => migration::enrich_publisher_relations(&tx).await,
                     EnrichMode::Role => migration::assign_roles(&tx).await,
-                    EnrichMode::Share => migration::add_party_averages(&tx).await,
+                    EnrichMode::Share => migration::add_party_stats(&tx).await,
                 }
             }
             .await;

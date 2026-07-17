@@ -127,3 +127,15 @@ pub async fn search_parties(
     }
     Ok(v)
 }
+
+pub async fn top_unsigned_writers(conn: &Connection) -> Result<(), libsql::Error> {
+    let sql = "
+    SELECT 1
+    FROM parties p
+    WHERE 
+        (role is NULL OR role = 'writer' OR role = 'both')
+        AND p.work_count > 1
+
+        ";
+    todo!()
+}
