@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use libsql::{Connection, params};
-use musicmeta::{ipi::IpiNameNum, iswc::Iswc, tis::society::TisSocietyCode};
+use musicmeta::{ipi::IpiNameNum, isrc::Isrc, iswc::Iswc, tis::society::TisSocietyCode};
 use serde::{Deserialize, Serialize};
 
 pub enum WorkSearch {
@@ -47,11 +47,13 @@ pub struct Release {
     pub artist_name: String,
     pub label_name: String,
     pub distro_name: String,
+    pub isrc: Option<Isrc>,
 }
 
 #[derive(Debug, Default)]
 pub struct WorkSearchParams {
     pub iswc: Option<Iswc>,
+    pub isrc: Option<Isrc>,
     pub title: Option<String>,
     pub artist: Option<String>,
     pub party_ipi: Option<IpiNameNum>,
@@ -70,7 +72,7 @@ pub async fn search_works(
           FROM works wk
           WHERE 1 = 1
             AND (?1 IS NULL OR wk.iswc = ?1)
-            AND (?2 IS NULL OR wk.title LIKE ?2)
+            AND (?2 IS NULL OR wk.title = ?2)
             AND (
               ?3 IS NULL OR EXISTS (
                 SELECT 1
@@ -78,19 +80,28 @@ pub async fn search_works(
                 JOIN resources rs ON rs.id = wr.resource_id
                 JOIN releases r ON r.id = rs.release_id
                 WHERE wr.work_id = wk.id
-                  AND r.artist_name LIKE ?3 || '%'
+                  AND r.artist_name = ?3
               )
             )
             AND (
               ?4 IS NULL OR EXISTS (
                 SELECT 1
+                FROM work_resources wr
+                JOIN resources rs ON rs.id = wr.resource_id
+                WHERE wr.work_id = wk.id
+                    AND rs.isrc = ?4
+              )
+            )
+            AND (
+              ?5 IS NULL OR EXISTS (
+                SELECT 1
                 FROM shares s
                 JOIN parties p ON p.id = s.party_id
                 WHERE s.work_id = wk.id
-                  AND p.ipi = ?4
+                  AND p.ipi = ?5
               )
             )
-          LIMIT ?5 OFFSET ?6
+          LIMIT ?6 OFFSET ?7
         )
         SELECT
           wk.id,
@@ -106,7 +117,8 @@ pub async fn search_works(
                           'title', r.title,
                           'artist_name', r.artist_name,
                           'label_name', r.label_name,
-                          'distro_name', r.distro_name
+                          'distro_name', r.distro_name,
+                          'isrc', rs.isrc
                       )
                   END
               ),
@@ -125,6 +137,7 @@ pub async fn search_works(
                 q.iswc.map(|x| x.to_string()),
                 q.title.map(|x| x.to_uppercase()),
                 q.artist.map(|x| x.to_uppercase()),
+                q.isrc.map(|x| x.to_string()),
                 q.party_ipi.map(|x| x.0 as i64),
                 q.limit as i64,
                 (q.offset * q.limit) as i64,
