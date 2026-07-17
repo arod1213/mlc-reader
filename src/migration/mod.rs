@@ -111,6 +111,44 @@ pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Erro
     Ok(())
 }
 
+/// indicate whether a party is primarily a writer / publisher
+pub async fn add_party_averages(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
+    conn.execute(
+        "ALTER TABLE parties ADD COLUMN average_share REAL DEFAULT 0.0;",
+        params!(),
+    )
+    .await?;
+
+    conn.execute(
+        "ALTER TABLE parties ADD COLUMN work_count INTEGER DEFAULT 0",
+        params!(),
+    )
+    .await?;
+
+    let sql = "
+        WITH party_stats AS (
+          SELECT
+              s.party_id,
+              COALESCE(AVG(s.share), 0) AS average_share,
+              COUNT(DISTINCT s.work_id) AS work_count
+          FROM shares AS s
+          GROUP BY s.party_id
+        )
+        UPDATE parties AS p
+        SET
+          average_share = COALESCE(
+              (SELECT ps.average_share FROM party_stats ps WHERE ps.party_id = p.id),
+              0
+          ),
+          work_count = COALESCE(
+              (SELECT ps.work_count FROM party_stats ps WHERE ps.party_id = p.id),
+              0
+          );";
+
+    _ = conn.execute(sql, params!()).await?;
+    Ok(())
+}
+
 /// save writer -> publisher and publisher -> publisher instances
 pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     let sql = "

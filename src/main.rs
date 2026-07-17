@@ -6,10 +6,8 @@ use mlc_reader::mutations::relations;
 use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use musicmeta::ipi::IpiNameNum;
-use musicmeta::isrc::Isrc;
 use serde::Deserialize;
 use std::path::PathBuf;
-use std::str::FromStr;
 use std::{env, io::BufReader};
 
 async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::Error> {
@@ -82,6 +80,7 @@ async fn main() {
                     EnrichMode::Writer => migration::enrich_writer_relations(&tx).await,
                     EnrichMode::Publisher => migration::enrich_publisher_relations(&tx).await,
                     EnrichMode::Role => migration::assign_roles(&tx).await,
+                    EnrichMode::Share => migration::add_party_averages(&tx).await,
                 }
             }
             .await;
@@ -151,6 +150,7 @@ pub enum EnrichMode {
     Writer,
     Publisher,
     Role,
+    Share,
 }
 #[derive(Debug, Deserialize, Clone, ValueEnum)]
 pub enum DiscoverMode {
