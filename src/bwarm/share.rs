@@ -1,7 +1,17 @@
 use libsql::params;
 use serde::{Deserialize, Serialize};
+use strum::{Display, EnumString};
 
 use crate::bwarm::interface::BwarmEntry;
+
+#[derive(Debug, Serialize, Deserialize, Display, EnumString)]
+#[serde(rename_all = "PascalCase")]
+#[strum(serialize_all = "snake_case")]
+pub enum PartyRole {
+    OriginalPublisher,
+    RightsAdministrator,
+    Composer,
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Share {
@@ -12,7 +22,7 @@ pub struct Share {
     #[serde(rename = "PartyRecordId")]
     pub party_id: i64,
     #[serde(rename = "PartyRole")]
-    pub role: String,
+    pub role: PartyRole,
     #[serde(rename = "RightShareType")]
     pub share_type: Option<String>,
     #[serde(rename = "RightsType")]
@@ -79,7 +89,7 @@ impl BwarmEntry for Share {
                 self.id.clone(),
                 self.work_id.clone(),
                 self.party_id,
-                self.role.clone(),
+                self.role.to_string(),
                 self.share_type.clone(),
                 self.rights_type.clone(),
                 self.share.unwrap_or_default(),

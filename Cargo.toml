@@ -16,3 +16,4 @@ ssh2 = "0.9.5"
 num_enum = "0.7.6"
 musicmeta = { git = "https://github.com/arod1213/musicmeta.git", version = "0.1.19" }
 chrono = { version = "0.4.45", features = ["serde"] }
+strum = "0.28.0"

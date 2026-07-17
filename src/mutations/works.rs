@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::NaiveDate;
 use libsql::{Connection, params};
 use musicmeta::{ipi::IpiNameNum, isrc::Isrc, iswc::Iswc, tis::society::TisSocietyCode};
 use serde::{Deserialize, Serialize};
@@ -48,6 +49,7 @@ pub struct Release {
     pub label_name: String,
     pub distro_name: String,
     pub isrc: Option<Isrc>,
+    pub release_date: Option<NaiveDate>,
 }
 
 #[derive(Debug, Default)]
@@ -113,12 +115,13 @@ pub async fn search_works(
               json_group_array(
                   CASE
                       WHEN r.id IS NOT NULL THEN json_object(
-                          'id', r.id,
-                          'title', r.title,
-                          'artist_name', r.artist_name,
-                          'label_name', r.label_name,
-                          'distro_name', r.distro_name,
-                          'isrc', rs.isrc
+                        'id', r.id,
+                        'title', r.title,
+                        'artist_name', r.artist_name,
+                        'label_name', r.label_name,
+                        'distro_name', r.distro_name,
+                        'isrc', rs.isrc,
+                        'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
                       )
                   END
               ),
@@ -197,7 +200,9 @@ pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo
                             'title', r.title,
                             'artist_name', r.artist_name,
                             'label_name', r.label_name,
-                            'distro_name', r.distro_name
+                            'distro_name', r.distro_name,
+                            'isrc', rs.isrc,
+                            'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
                         )
                     END
                 ),

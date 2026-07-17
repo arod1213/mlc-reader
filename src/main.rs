@@ -46,7 +46,7 @@ async fn main() {
             let q = WorkSearchParams {
                 title: name,
                 artist,
-                isrc: Some(Isrc::from_str("JPP302400282").unwrap()),
+                // isrc: Some(Isrc::from_str("JPP302400282").unwrap()),
                 party_ipi: ipi,
                 offset: 0,
                 limit: 10,
