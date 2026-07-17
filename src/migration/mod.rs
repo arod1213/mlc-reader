@@ -3,7 +3,7 @@ use crate::{
         party::Party, release::Release, resource::Resource, share::Share,
         work_resource::WorkResource, works::Work,
     },
-    migration::utils::{disable_fk, migrate_schema, save_object},
+    migration::utils::{disable_fk, migrate_schema, save_object, setup_write_mode},
     server::{self, Credential},
 };
 use libsql::{Connection, params};
@@ -27,6 +27,7 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
 pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
     migrate_schema(conn).await.expect("failed to migrate");
 
+    setup_write_mode(conn).await.expect("failed to setup WAL");
     disable_fk(conn).await.expect("failed to disable FKs");
 
     let tx = conn
@@ -68,9 +69,10 @@ pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Er
 
 pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     create_publisher_relation_index(conn).await?;
+    create_party_indexes(conn).await?;
     create_share_index(conn).await?;
     create_relation_index(conn).await?;
-    create_work_resource_index(conn).await?;
+    create_work_indexes(conn).await?;
     Ok(())
 }
 
@@ -219,10 +221,19 @@ impl WriterRelations {
 //---------------------------
 // INDEXES
 
+async fn create_party_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    let sql = "
+        CREATE INDEX idx_party_ipi ON parties(ipi);
+        ";
+    _ = conn.execute(sql, params!()).await?;
+    Ok(())
+}
+
 async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         CREATE INDEX idx_publisher_relations_parent_occ
         ON publisher_relations (parent_id, occurrences DESC);
+
         CREATE INDEX idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
         ";
@@ -230,7 +241,7 @@ async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql
     Ok(())
 }
 
-async fn create_work_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
+async fn create_work_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource
         ON work_resources(work_id, resource_id);

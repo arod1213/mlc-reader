@@ -22,8 +22,8 @@ pub struct PartyInfo {
 pub struct Share {
     pub id: String,
     pub role: String,
-    pub share_type: String,
-    pub rights_type: String,
+    pub share_type: Option<String>,
+    pub rights_type: Option<String>,
     pub share: f64,
     pub preceding_id: Option<String>,
     // pub territory: String,
@@ -65,54 +65,59 @@ pub async fn search_works(
     is_deep: bool,
 ) -> Result<Vec<WorkInfo>, libsql::Error> {
     let sql = "
-        SELECT 
-            wk.id, 
-            wk.title,
-            wk.duration_ms,
-            wk.iswc,
-            wk.in_dispute,
-            COALESCE(
-                json_group_array(
-                    CASE
-                        WHEN r.id IS NOT NULL THEN json_object(
-                            'id', r.id,
-                            'title', r.title,
-                            'artist_name', r.artist_name,
-                            'label_name', r.label_name,
-                            'distro_name', r.distro_name
-                        )
-                    END
-                ),
-                '[]'
-            ) as releases
-        FROM works wk
+        WITH matched_works AS (
+          SELECT wk.id
+          FROM works wk
+          WHERE 1 = 1
+            AND (?1 IS NULL OR wk.iswc = ?1)
+            AND (?2 IS NULL OR wk.title LIKE ?2)
+            AND (
+              ?3 IS NULL OR EXISTS (
+                SELECT 1
+                FROM work_resources wr
+                JOIN resources rs ON rs.id = wr.resource_id
+                JOIN releases r ON r.id = rs.release_id
+                WHERE wr.work_id = wk.id
+                  AND r.artist_name LIKE ?3 || '%'
+              )
+            )
+            AND (
+              ?4 IS NULL OR EXISTS (
+                SELECT 1
+                FROM shares s
+                JOIN parties p ON p.id = s.party_id
+                WHERE s.work_id = wk.id
+                  AND p.ipi = ?4
+              )
+            )
+          LIMIT ?5 OFFSET ?6
+        )
+        SELECT
+          wk.id,
+          wk.title,
+          wk.duration_ms,
+          wk.iswc,
+          wk.in_dispute,
+          COALESCE(
+              json_group_array(
+                  CASE
+                      WHEN r.id IS NOT NULL THEN json_object(
+                          'id', r.id,
+                          'title', r.title,
+                          'artist_name', r.artist_name,
+                          'label_name', r.label_name,
+                          'distro_name', r.distro_name
+                      )
+                  END
+              ),
+              '[]'
+          ) AS releases
+        FROM matched_works mw
+        JOIN works wk ON wk.id = mw.id
         LEFT JOIN work_resources wr ON wr.work_id = wk.id
         LEFT JOIN resources rs ON rs.id = wr.resource_id
-        LEFT JOIN releases r on r.id = rs.release_id
-        WHERE (
-            $1::text is NULL 
-            OR wk.iswc = $1::text
-        )
-        AND (
-            $2::text is NULL 
-            OR wk.title LIKE $2::text
-        )
-        AND (
-            $3::text is NULL 
-            OR r.artist_name LIKE $3::text || '%'
-        )
-        AND (
-            $4::bigint is NULL
-            OR EXISTS (
-                SELECT 1
-                FROM shares s 
-                JOIN parties p on p.id = s.party_id  
-                WHERE s.work_id = wk.id 
-                    AND p.ipi = $4::bigint
-            )
-        )
-        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
-        LIMIT $5 OFFSET $6;";
+        LEFT JOIN releases r ON r.id = rs.release_id
+        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
     let mut rows = conn
         .query(
             sql,

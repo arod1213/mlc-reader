@@ -7,9 +7,19 @@ use crate::bwarm::{
     interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
     work_resource::WorkResource, works::Work,
 };
-
 pub async fn disable_fk(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn.execute("PRAGMA foreign_keys = OFF", params!()).await?;
+    Ok(())
+}
+
+pub async fn setup_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "PRAGMA journal_mode = WAL;
+            PRAGMA synchronous = NORMAL;",
+            params!(),
+        )
+        .await?;
     Ok(())
 }
 

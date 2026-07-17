@@ -14,9 +14,9 @@ pub struct Share {
     #[serde(rename = "PartyRole")]
     pub role: String,
     #[serde(rename = "RightShareType")]
-    pub share_type: String,
+    pub share_type: Option<String>,
     #[serde(rename = "RightsType")]
-    pub rights_type: String,
+    pub rights_type: Option<String>,
     #[serde(rename = "RightSharePercentage")]
     pub share: Option<f64>,
     #[serde(rename = "TerritoryCode")]
@@ -37,8 +37,8 @@ impl BwarmEntry for Share {
            work_id TEXT NOT NULL REFERENCES works(id),
            party_id INTEGER NOT NULL REFERENCES parties(id),
            role TEXT NOT NULL,
-           share_type TEXT NOT NULL,
-           rights_type TEXT NOT NULL,
+           share_type TEXT,
+           rights_type TEXT,
            share REAL NOT NULL,
            territory TEXT NOT NULL,
            preceding_id TEXT

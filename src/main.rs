@@ -44,7 +44,7 @@ async fn main() {
             let q = WorkSearchParams {
                 title: name,
                 artist,
-                party_ipi: Some(IpiNameNum(1051977352)),
+                // party_ipi: Some(IpiNameNum(1051977352)),
                 offset: 0,
                 limit: 10,
                 ..WorkSearchParams::default()

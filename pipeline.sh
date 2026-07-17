@@ -1,8 +1,8 @@
 # cargo run -- save && \
 
 #cargo run -- migrate -p './mlc-sample' && \
-#cargo run -- migrate -p './Sample Data' && \
-cargo run -- migrate -p './mlc-bwarm' && \
+cargo run -- migrate -p './Sample Data' && \
+#cargo run -- migrate -p './mlc-bwarm' && \
 
 cargo run -- modify && \
 cargo run -- enrich -m writer && \
