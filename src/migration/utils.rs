@@ -38,7 +38,7 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
     let mut stmt = T::prepare(tx).await?;
     let mut sum = 0;
 
-    let capacity = 500;
+    let capacity = 900;
     let mut objects: Vec<T> = Vec::with_capacity(capacity);
     for entry in rdr.records() {
         let mut x = entry?;
