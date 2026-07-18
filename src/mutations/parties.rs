@@ -144,8 +144,10 @@ pub async fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, libsq
       p.id,
       p.first_name,
       p.last_name,
+      p.full_name,
       p.pro,
-      p.ipi
+      p.ipi,
+      p.role
   FROM parties p
   WHERE
       (role IS NULL OR role IN ('writer', 'both'))
@@ -167,17 +169,27 @@ pub async fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, libsq
   ORDER BY p.average_share DESC";
     let mut rows = conn.query(sql, params!(20.0)).await?;
     let mut v = vec![];
-    while let Some(row) = rows.next().await? {
+    while let Ok(Some(row)) = rows.next().await {
+        let last = match row.get(2) {
+            Ok(x) => x,
+            Err(_) => row.get(3)?,
+        };
         v.push(Party {
             id: row.get(0)?,
-            first_name: row.get(1)?,
-            last_name: row.get(2)?,
+            first_name: row.get(1).ok(),
+            last_name: last,
             ipi_name_num: row
                 .get::<i64>(5)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
-            pro: None,
-            role: None,
+            pro: row
+                .get::<i64>(4)
+                .ok()
+                .and_then(|x| TisSocietyCode::try_from(x as u16).ok()),
+            role: row
+                .get::<String>(6)
+                .ok()
+                .and_then(|x| Role::from_str(&x).ok()),
         })
     }
     Ok(v)
