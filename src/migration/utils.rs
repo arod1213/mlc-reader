@@ -54,6 +54,10 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
         obj.insert(&mut stmt).await?;
         stmt.reset();
         sum += 1;
+        // TODO: remove but just to keep reads fast
+        if sum > 1000000 {
+            break;
+        }
     }
     println!("INSERTED {}", sum);
     Ok(())

@@ -3,15 +3,18 @@ set -euo pipefail
 
 # cargo run -- save && \
 
-DATA_PATH="./mlc-sample"
+#DATA_PATH="./mlc-sample"
 #DATA_PATH="./Sample Data"
-#DATA_PATH="/mlc-bwarm"
-cargo run -- migrate -p "$DATA_PATH" && \
+DATA_PATH="./mlc-bwarm"
 
-cargo run -- modify && \
-cargo run -- enrich -m writer && \
-cargo run -- enrich -m publisher && \
-cargo run -- enrich -m share 
+cargo build --release
+BIN="./target/release/mlc-reader"
+$BIN migrate -p "$DATA_PATH" && \
+
+$BIN modify && \
+$BIN enrich -m writer > /dev/null && \
+$BIN enrich -m publisher > /dev/null && \
+$BIN enrich -m share > /dev/null 
 
 
 # cargo run -- update -p './updates.txt' && \

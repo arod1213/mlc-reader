@@ -282,7 +282,9 @@ async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql
     let sql = "
         CREATE INDEX idx_publisher_relations_parent_occ
         ON publisher_relations (parent_id, occurrences DESC);
-
+        ";
+    _ = conn.execute(sql, params!()).await?;
+    let sql = "
         CREATE INDEX idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
         ";
@@ -309,23 +311,49 @@ async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
 }
 
 async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
-    let sql = "
+    _ = conn
+        .execute(
+            "
         CREATE INDEX idx_shares_party_id
         ON shares(party_id);
-
+",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "
         CREATE INDEX idx_shares_preceding_id
         ON shares(preceding_id);
-
+",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "
         CREATE INDEX idx_shares_preceding_party
         ON shares(preceding_id, party_id);
-
+",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "
         CREATE INDEX idx_shares_work_preceeding_shares
         ON shares(work_id, preceding_id);
+",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
+            params!(),
+        )
+        .await?;
 
-        CREATE INDEX IF NOT EXISTS idx_shares_work_party
-        ON shares(work_id, party_id);
-        ";
-    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
 

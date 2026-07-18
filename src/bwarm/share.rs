@@ -11,6 +11,8 @@ pub enum PartyRole {
     OriginalPublisher,
     RightsAdministrator,
     Composer,
+    SubPublisher,
+    SubstitutedPublisher,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
