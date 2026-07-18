@@ -2,6 +2,7 @@ use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use libsql::Builder;
 use mlc_reader::migration::utils::disable_fk;
+use mlc_reader::mutations::parties::top_unsigned_writers;
 use mlc_reader::mutations::relations;
 use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
@@ -30,6 +31,10 @@ async fn main() {
 
     let args = Args::parse();
     match args.command {
+        Command::Talent {} => {
+            let res = top_unsigned_writers(&conn).await.unwrap();
+            dbg!(res);
+        }
         Command::GetWork { id } => {
             let res = works::get_works(&conn, &[id]).await.unwrap();
             dbg!(res);
@@ -113,6 +118,7 @@ pub struct Args {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
+    Talent {},
     GetWork {
         #[arg(short, long)]
         id: String,
