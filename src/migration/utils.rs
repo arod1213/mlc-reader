@@ -46,7 +46,6 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
         let obj = match x.deserialize::<T>(Some(&headers)) {
             Ok(x) => x,
             Err(e) => {
-                // CSV deserialize error: record 59077055 (line: 59077056, byte: 3064164553): field 8: invalid digit found in string
                 eprintln!("error: {e}\nfrom: {:?}", x);
                 continue;
             }
@@ -54,10 +53,6 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
         obj.insert(&mut stmt).await?;
         stmt.reset();
         sum += 1;
-        // TODO: remove but just to keep reads fast
-        if sum > 1000000 {
-            break;
-        }
     }
     println!("INSERTED {}", sum);
     Ok(())

@@ -9,18 +9,29 @@ use crate::{
 use libsql::{Connection, params};
 use std::path::Path;
 
+mod trim;
 pub mod utils;
 
 /// save TSV files from SFTP
 pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
+    println!("dir is {:?}", dir);
     server::save_doc::<Resource>(&sftp, &dir).expect("failed to save Resources");
     server::save_doc::<Release>(&sftp, &dir).expect("failed to save Releases");
     server::save_doc::<Work>(&sftp, &dir).expect("failed to save Works");
     server::save_doc::<WorkResource>(&sftp, &dir).expect("failed to save WorkResources");
     server::save_doc::<Party>(&sftp, &dir).expect("failed to save Parties");
     server::save_doc::<Share>(&sftp, &dir).expect("failed to save Shares");
+}
+
+pub async fn trim_db(conn: &Connection) -> Result<(), libsql::Error> {
+    trim::trim_shares(conn).await?;
+    trim::trim_works(conn).await?;
+    trim::trim_releases(conn).await?;
+    trim::trim_parties(conn).await?;
+    _ = conn.execute("VACUUM", params!()).await?;
+    Ok(())
 }
 
 /// migrate DB and save TSV files into db

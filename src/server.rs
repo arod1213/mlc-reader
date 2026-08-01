@@ -14,7 +14,8 @@ use crate::bwarm::interface::BwarmEntry;
 pub struct Credential {
     pub host: String,
     pub username: String,
-    pub pw: String,
+    pub public_key: PathBuf,
+    pub private_key: PathBuf,
 }
 
 impl Credential {
@@ -23,7 +24,13 @@ impl Credential {
         let mut session = Session::new()?;
         session.set_tcp_stream(tcp);
         session.handshake().unwrap();
-        session.userauth_password(&self.username, &self.pw)?;
+
+        session.userauth_pubkey_file(
+            &self.username,
+            Some(&self.public_key),
+            &self.private_key,
+            None,
+        )?;
 
         let sftp = session.sftp()?;
         Ok(sftp)
@@ -31,7 +38,7 @@ impl Credential {
 }
 
 pub fn latest_dir(ftp: &Sftp) -> Option<PathBuf> {
-    let dirs = ftp.readdir(".").ok()?;
+    let dirs = ftp.readdir("./public-database-v2").ok()?;
     dirs.iter()
         .filter(|x| x.1.is_dir())
         .max_by_key(|(_, stat)| stat.mtime)
@@ -43,9 +50,10 @@ pub fn save_doc<T: BwarmEntry>(
     in_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let latest_file = in_dir.join(T::filename());
+    println!("looking for {:?}", latest_file);
     let file = ftp.open(latest_file)?;
     let outpath = PathBuf::from(T::filename());
-    let output = File::open(outpath)?;
+    let output = File::create(outpath)?;
 
     let mut reader = BufReader::new(file);
     let mut writer = BufWriter::new(output);

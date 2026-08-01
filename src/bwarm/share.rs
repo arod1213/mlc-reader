@@ -13,6 +13,12 @@ pub enum PartyRole {
     Composer,
     SubPublisher,
     SubstitutedPublisher,
+    Arranger,
+    ComposerLyricist,
+    Lyricist,
+    SubLyricist,
+    Translator,
+    Adapter,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

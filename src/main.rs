@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use libsql::Builder;
+use mlc_reader::migration::trim_db;
 use mlc_reader::migration::utils::disable_fk;
 use mlc_reader::mutations::parties::top_unsigned_writers;
 use mlc_reader::mutations::relations;
@@ -63,7 +64,8 @@ async fn main() {
             let cred = Credential {
                 host: env::var("MLC_HOST").expect("missing MLC_HOST"),
                 username: env::var("MLC_USER").expect("missing MLC_USER"),
-                pw: env::var("MLC_PW").expect("missing MLC_PW"),
+                public_key: env::var("MLC_PUBLIC_KEY").unwrap().into(),
+                private_key: env::var("MLC_PRIVATE_KEY").unwrap().into(),
             };
             migration::save_remote_mlc_docs(&cred);
         }
@@ -74,6 +76,9 @@ async fn main() {
         // save MLC BWARM TSV files into DB
         Command::Modify {} => {
             migration::migrate_add_ons(&conn).await.unwrap();
+        }
+        Command::Trim {} => {
+            trim_db(&conn).await.unwrap();
         }
         // add relational tables and indexes in DB
         Command::Enrich { method } => {
@@ -119,6 +124,7 @@ pub struct Args {
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Talent {},
+    Trim {},
     GetWork {
         #[arg(short, long)]
         id: String,
