@@ -66,13 +66,13 @@ impl BwarmEntry for Work<'_> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Work {
-            id: &fields[0],
+            id: fields.get(0).ok_or("missing id")?,
             iswc: fields.get(1),
-            title: &fields[2],
-            duration_ms: fields[6].parse::<f64>().ok(),
-            in_dispute: &fields[7] == "TRUE",
-            alt_id: fields[10].parse().ok(),
-            is_arrangement: &fields[9] == "TRUE",
+            title: fields.get(2).ok_or("missing title")?,
+            duration_ms: fields.get(6).and_then(|x| x.parse::<f64>().ok()),
+            in_dispute: fields.get(7).ok_or("missing dispute flag")? == "TRUE",
+            alt_id: fields.get(10).and_then(|x| x.parse().ok()),
+            is_arrangement: fields.get(9).map(|x| x == "TRUE").unwrap_or_default(),
             territory: fields.get(8),
         };
         _ = stmt

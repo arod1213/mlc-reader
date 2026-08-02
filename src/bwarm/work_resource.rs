@@ -47,9 +47,9 @@ impl BwarmEntry for WorkResource<'_> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = WorkResource {
-            id: fields[0].parse::<u64>()?,
-            work_id: &fields[1],
-            resource_id: &fields[2],
+            id: fields.get(0).ok_or("missing id")?.parse::<u64>()?,
+            work_id: fields.get(1).ok_or("missing work id")?,
+            resource_id: fields.get(2).ok_or("missing resource id")?,
         };
         _ = stmt
             .execute(params!(x.id, x.work_id, x.resource_id,))

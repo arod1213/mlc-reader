@@ -57,14 +57,14 @@ impl BwarmEntry for Party<'_> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Party {
-            id: fields[0].parse::<i64>()?,
+            id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
             isni: fields.get(1),
-            ipi: fields[2].parse::<i64>().ok(),
+            ipi: fields.get(2).and_then(|x| x.parse::<i64>().ok()),
             email: fields.get(10),
             cisac_id: fields.get(3),
             dpid: fields.get(4),
             contact_name: fields.get(9),
-            full_name: &fields[5],
+            full_name: fields.get(5).ok_or("missing full name")?,
             last_name: fields.get(7),
             first_name: fields.get(6),
         };

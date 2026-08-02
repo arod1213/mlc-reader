@@ -38,13 +38,13 @@ pub struct Share<'a> {
 impl<'a> Share<'a> {
     pub fn from_csv<'r>(fields: &'r StringRecord) -> Result<Share<'r>, Box<dyn std::error::Error>> {
         Ok(Share {
-            id: &fields[0],
-            work_id: &fields[1],
-            party_id: fields[2].parse::<i64>()?,
-            role: &fields[3],
-            share: fields[4].parse::<f64>().ok(),
+            id: fields.get(0).ok_or("missing id")?,
+            work_id: fields.get(1).ok_or("missing work id")?,
+            party_id: fields.get(2).ok_or("missing party id")?.parse::<i64>()?,
+            role: fields.get(3).ok_or("missing role")?,
+            share: fields.get(4).and_then(|x| x.parse::<f64>().ok()),
             rights_type: fields.get(5),
-            territory: &fields[9],
+            territory: fields.get(9).ok_or("missing territory")?,
             preceding_id: fields.get(8),
         })
     }
@@ -100,13 +100,13 @@ impl BwarmEntry for Share<'_> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Share {
-            id: &fields[0],
-            work_id: &fields[1],
-            party_id: fields[2].parse::<i64>()?,
-            role: &fields[3],
-            share: fields[4].parse::<f64>().ok(),
+            id: fields.get(0).ok_or("missing id")?,
+            work_id: fields.get(1).ok_or("missing work id")?,
+            party_id: fields.get(2).ok_or("missing party id")?.parse::<i64>()?,
+            role: fields.get(3).ok_or("missing role")?,
+            share: fields.get(4).and_then(|x| x.parse::<f64>().ok()),
             rights_type: fields.get(5),
-            territory: &fields[9],
+            territory: fields.get(9).ok_or("missing territory")?,
             preceding_id: fields.get(8),
         };
         _ = stmt

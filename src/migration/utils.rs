@@ -42,9 +42,13 @@ where
 
     for entry in rdr.records() {
         let entry = entry?;
-        T::insert_from_csv(&entry, &mut stmt).await?;
+        match T::insert_from_csv(&entry, &mut stmt).await {
+            Ok(_) => sum += 1,
+            Err(e) => {
+                eprintln!("failed to save: {e}");
+            }
+        };
         stmt.reset();
-        sum += 1;
     }
     tx.commit().await?;
     println!("inserted {sum}");

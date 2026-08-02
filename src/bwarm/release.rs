@@ -59,12 +59,12 @@ impl<'a> BwarmEntry for Release<'a> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Release {
-            id: fields[0].parse::<i64>()?,
-            title: &fields[2],
-            artist_name: &fields[5],
-            label_name: &fields[7],
+            id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
+            title: fields.get(2).ok_or("missing title")?,
+            artist_name: fields.get(5).ok_or("missing artist name")?,
+            label_name: fields.get(7).ok_or("missing label name")?,
             release_date: fields.get(9),
-            distro_name: &fields[8],
+            distro_name: fields.get(8).ok_or("missing distro name")?,
         };
         _ = stmt
             .execute(params!(

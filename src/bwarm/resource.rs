@@ -14,21 +14,6 @@ pub struct Resource<'a> {
     pub title: &'a str,
 }
 
-impl Resource<'_> {
-    pub fn from_csv<'r>(
-        fields: &'r StringRecord,
-    ) -> Result<Resource<'r>, Box<dyn std::error::Error>> {
-        Ok(Resource {
-            id: &fields[0],
-            data_provider: &fields[14],
-            release_id: fields[11].parse::<u64>()?,
-            resource_type: &fields[1],
-            isrc: fields.get(2),
-            title: &fields[3],
-        })
-    }
-}
-
 impl BwarmEntry for Resource<'_> {
     fn filename() -> String {
         "resources.tsv".into()
@@ -71,12 +56,12 @@ impl BwarmEntry for Resource<'_> {
         stmt: &mut libsql::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Resource {
-            id: &fields[0],
-            data_provider: &fields[14],
-            release_id: fields[11].parse::<u64>()?,
-            resource_type: &fields[1],
+            id: fields.get(0).ok_or("missing id")?,
+            data_provider: fields.get(14).ok_or("missing data provider")?,
+            release_id: fields.get(11).ok_or("missing release id")?.parse::<u64>()?,
+            resource_type: fields.get(1).ok_or("missing resource type")?,
             isrc: fields.get(2),
-            title: &fields[3],
+            title: fields.get(3).ok_or("missing title")?,
         };
         _ = stmt
             .execute(params!(
