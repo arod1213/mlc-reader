@@ -12,12 +12,13 @@ BIN="./target/release/mlc-reader"
 
 # $BIN save
 $BIN migrate -p "$DATA_PATH"
+$BIN index-trim
+$BIN trim --vacuum
+$BIN index-search
 
-$BIN modify
-# $BIN trim
-# $BIN enrich -m writer > /dev/null
-# $BIN enrich -m publisher > /dev/null
-# $BIN enrich -m share > /dev/null 
+$BIN enrich -m writer > /dev/null
+$BIN enrich -m publisher > /dev/null
+$BIN enrich -m share > /dev/null 
 
 
 # cargo run -- update -p './updates.txt' && \

@@ -74,11 +74,14 @@ async fn main() {
             migration::migrate_from_bwarm_dump(&conn, &path).await;
         }
         // save MLC BWARM TSV files into DB
-        Command::Modify {} => {
+        Command::IndexSearch {} => {
             migration::migrate_add_ons(&conn).await.unwrap();
         }
-        Command::Trim {} => {
-            trim_db(&conn).await.unwrap();
+        Command::IndexTrim {} => {
+            migration::create_resource_index(&conn).await.unwrap();
+        }
+        Command::Trim { vacuum } => {
+            trim_db(&conn, vacuum).await.unwrap();
         }
         // add relational tables and indexes in DB
         Command::Enrich { method } => {
@@ -124,7 +127,6 @@ pub struct Args {
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Talent {},
-    Trim {},
     GetWork {
         #[arg(short, long)]
         id: String,
@@ -146,7 +148,12 @@ pub enum Command {
         #[arg(short, long)]
         path: PathBuf,
     },
-    Modify {},
+    IndexSearch {},
+    IndexTrim {},
+    Trim {
+        #[arg(short, long)]
+        vacuum: bool,
+    },
     Enrich {
         #[arg(short, long)]
         method: EnrichMode,

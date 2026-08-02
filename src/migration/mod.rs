@@ -27,7 +27,7 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
     server::save_doc::<Share>(&sftp, &dir).expect("failed to save Shares");
 }
 
-pub async fn trim_db(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
     trim::trim_shares(conn).await?;
     println!("trimmed shares");
     trim::trim_works(conn).await?;
@@ -36,7 +36,9 @@ pub async fn trim_db(conn: &Connection) -> Result<(), libsql::Error> {
     println!("trimmed releases");
     trim::trim_parties(conn).await?;
     println!("trimmed parties");
-    _ = conn.execute("VACUUM", params!()).await?;
+    if vacuum {
+        _ = conn.execute("VACUUM", params!()).await?;
+    }
     Ok(())
 }
 
@@ -67,18 +69,17 @@ pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Er
     // modify_parties_migration(conn)?;
     PublisherRelations::migrate(conn).await?;
     WriterRelations::migrate(conn).await?;
-    create_indexes(conn).await?;
+    create_search_indexes(conn).await?;
     create_party_fts(conn).await?;
     Ok(())
 }
 
-pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn create_search_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     create_publisher_relation_index(conn).await?;
     create_party_indexes(conn).await?;
     create_share_index(conn).await?;
     create_relation_index(conn).await?;
     create_work_indexes(conn).await?;
-    create_resource_index(conn).await?;
     Ok(())
 }
 
@@ -321,7 +322,7 @@ async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
 // CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id
 // ON work_resources(resource_id);
 
-async fn create_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn create_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn
         .execute(
             "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id 
