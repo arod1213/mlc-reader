@@ -1,5 +1,22 @@
 use libsql::{Connection, params};
 
+async fn run_pragma(conn: &Connection, sql: &str) -> Result<(), libsql::Error> {
+    let mut rows = conn.query(sql, params!()).await?;
+    while rows.next().await?.is_some() {}
+    Ok(())
+}
+
+pub async fn setup_bulk_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
+    run_pragma(conn, "PRAGMA foreign_keys = OFF").await?;
+    run_pragma(conn, "PRAGMA journal_mode = WAL").await?;
+    run_pragma(conn, "PRAGMA synchronous = OFF").await?;
+    run_pragma(conn, "PRAGMA temp_store = MEMORY").await?;
+    run_pragma(conn, "PRAGMA cache_size = -2000000").await?;
+    run_pragma(conn, "PRAGMA mmap_size = 30000000000").await?;
+    run_pragma(conn, "PRAGMA busy_timeout = 60000").await?;
+    Ok(())
+}
+
 pub async fn trim_works(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         DELETE FROM works

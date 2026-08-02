@@ -75,10 +75,12 @@ async fn main() {
         }
         // save MLC BWARM TSV files into DB
         Command::IndexSearch {} => {
-            migration::migrate_add_ons(&conn).await.unwrap();
+            migration::create_search_tables_indexes(&conn)
+                .await
+                .unwrap();
         }
         Command::IndexTrim {} => {
-            migration::create_resource_index(&conn).await.unwrap();
+            migration::create_trim_shares_indexes(&conn).await.unwrap();
         }
         Command::Trim { vacuum } => {
             trim_db(&conn, vacuum).await.unwrap();

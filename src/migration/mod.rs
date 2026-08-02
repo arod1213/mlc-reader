@@ -3,7 +3,10 @@ use crate::{
         party::Party, release::Release, resource::Resource, share::Share,
         work_resource::WorkResource, works::Work,
     },
-    migration::utils::{disable_fk, migrate_schema, save_object, setup_write_mode},
+    migration::{
+        trim::setup_bulk_write_mode,
+        utils::{disable_fk, migrate_schema, save_object},
+    },
     server::{self, Credential},
 };
 use libsql::{Connection, params};
@@ -28,14 +31,24 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
 }
 
 pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
+    trim::setup_bulk_write_mode(conn).await?;
+
+    create_trim_shares_indexes(conn).await?;
     trim::trim_shares(conn).await?;
     println!("trimmed shares");
+
+    create_trim_works_indexes(conn).await?;
     trim::trim_works(conn).await?;
     println!("trimmed works");
+
+    create_trim_releases_indexes(conn).await?;
     trim::trim_releases(conn).await?;
     println!("trimmed releases");
+
+    create_trim_parties_indexes(conn).await?;
     trim::trim_parties(conn).await?;
     println!("trimmed parties");
+
     if vacuum {
         _ = conn.execute("VACUUM", params!()).await?;
     }
@@ -46,26 +59,21 @@ pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Erro
 pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
     migrate_schema(conn).await.expect("failed to migrate");
 
-    setup_write_mode(conn).await.expect("failed to setup WAL");
+    setup_bulk_write_mode(conn)
+        .await
+        .expect("failed to setup WAL");
     disable_fk(conn).await.expect("failed to disable FKs");
 
-    let tx = conn
-        .transaction()
-        .await
-        .expect("failed to setup transaction");
-
-    save_object::<Release>(&tx, bwarm_dir).await.unwrap();
-    save_object::<Resource>(&tx, bwarm_dir).await.unwrap();
-    save_object::<Party>(&tx, bwarm_dir).await.unwrap();
-    save_object::<Work>(&tx, bwarm_dir).await.unwrap();
-    save_object::<WorkResource>(&tx, bwarm_dir).await.unwrap();
-    save_object::<Share>(&tx, bwarm_dir).await.unwrap();
-
-    tx.commit().await.expect("failed to commit");
+    save_object::<Release>(conn, bwarm_dir).await.unwrap();
+    save_object::<Resource>(conn, bwarm_dir).await.unwrap();
+    save_object::<Party>(conn, bwarm_dir).await.unwrap();
+    save_object::<Work>(conn, bwarm_dir).await.unwrap();
+    save_object::<WorkResource>(conn, bwarm_dir).await.unwrap();
+    save_object::<Share>(conn, bwarm_dir).await.unwrap();
 }
 
 /// add new tables and indexes
-pub async fn migrate_add_ons(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+pub async fn create_search_tables_indexes(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     // modify_parties_migration(conn)?;
     PublisherRelations::migrate(conn).await?;
     WriterRelations::migrate(conn).await?;
@@ -80,6 +88,72 @@ pub async fn create_search_indexes(conn: &Connection) -> Result<(), libsql::Erro
     create_share_index(conn).await?;
     create_relation_index(conn).await?;
     create_work_indexes(conn).await?;
+    Ok(())
+}
+
+pub async fn create_trim_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    create_trim_shares_indexes(conn).await?;
+    create_trim_works_indexes(conn).await?;
+    create_trim_releases_indexes(conn).await?;
+    create_trim_parties_indexes(conn).await?;
+    Ok(())
+}
+
+pub async fn create_trim_shares_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
+            params!(),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn create_trim_works_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource ON work_resources(work_id, resource_id);",
+            params!(),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn create_trim_releases_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id ON resources(release_id, id);",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id ON work_resources(resource_id);",
+            params!(),
+        )
+        .await?;
+    Ok(())
+}
+
+pub async fn create_trim_parties_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
+            params!(),
+        )
+        .await?;
     Ok(())
 }
 
@@ -279,7 +353,7 @@ impl WriterRelations {
 
 async fn create_party_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
-        CREATE INDEX idx_party_ipi ON parties(ipi);
+        CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);
         ";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
@@ -287,12 +361,12 @@ async fn create_party_indexes(conn: &Connection) -> Result<(), libsql::Error> {
 
 async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
-        CREATE INDEX idx_publisher_relations_parent_occ
+        CREATE INDEX IF NOT EXISTS idx_publisher_relations_parent_occ
         ON publisher_relations (parent_id, occurrences DESC);
         ";
     _ = conn.execute(sql, params!()).await?;
     let sql = "
-        CREATE INDEX idx_publisher_relations_child_occ
+        CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
         ";
     _ = conn.execute(sql, params!()).await?;
@@ -316,63 +390,29 @@ async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
-// CREATE INDEX IF NOT EXISTS idx_resources_release_id_id
-// ON resources(release_id, id);
-//
-// CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id
-// ON work_resources(resource_id);
 
-pub async fn create_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id 
-ON resources(release_id, id)",
-            params!(),
-        )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id
-ON work_resources(resource_id);",
-            params!(),
-        )
-        .await?;
-    Ok(())
-}
 async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn
         .execute(
-            "
-        CREATE INDEX idx_shares_party_id
-        ON shares(party_id);
-",
+            "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
             params!(),
         )
         .await?;
     _ = conn
         .execute(
-            "
-        CREATE INDEX idx_shares_preceding_id
-        ON shares(preceding_id);
-",
+            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
             params!(),
         )
         .await?;
     _ = conn
         .execute(
-            "
-        CREATE INDEX idx_shares_preceding_party
-        ON shares(preceding_id, party_id);
-",
+            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_party ON shares(preceding_id, party_id);",
             params!(),
         )
         .await?;
     _ = conn
         .execute(
-            "
-        CREATE INDEX idx_shares_work_preceeding_shares
-        ON shares(work_id, preceding_id);
-",
+            "CREATE INDEX IF NOT EXISTS idx_shares_work_preceeding_shares ON shares(work_id, preceding_id);",
             params!(),
         )
         .await?;

@@ -36,14 +36,17 @@ where
         .has_headers(true)
         .from_reader(file);
 
-    let mut stmt = T::prepare(conn).await?;
+    let tx = conn.transaction().await?;
+    let mut stmt = T::prepare(&tx).await?;
     let mut sum = 0;
+
     for entry in rdr.records() {
         let entry = entry?;
         T::insert_from_csv(&entry, &mut stmt).await?;
         stmt.reset();
         sum += 1;
     }
+    tx.commit().await?;
     println!("inserted {sum}");
     Ok(())
 }
