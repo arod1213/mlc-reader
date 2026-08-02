@@ -1,33 +1,24 @@
+use csv::StringRecord;
 use libsql::params;
 use serde::{Deserialize, Serialize};
 
 use crate::bwarm::interface::BwarmEntry;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Party {
-    #[serde(rename = "#PartyRecordId")]
+pub struct Party<'a> {
     pub id: i64,
-    #[serde(rename = "EmailAddress", default)]
-    pub email: Option<String>,
-    #[serde(rename = "ISNI", default)]
-    pub isni: Option<String>,
-    #[serde(rename = "CisacID", alias = "CisacSocietyId", default)]
-    pub cisac_id: Option<String>,
-    #[serde(rename = "DPID", default)]
-    pub dpid: Option<String>,
-    #[serde(rename = "IpiNameNumber", default)]
+    pub email: Option<&'a str>,
+    pub isni: Option<&'a str>,
+    pub cisac_id: Option<&'a str>,
+    pub dpid: Option<&'a str>,
     pub ipi: Option<i64>,
-    #[serde(rename = "ContactName", default)]
-    pub contact_name: Option<String>,
-    #[serde(rename = "FullName")]
-    pub full_name: String,
-    #[serde(rename = "KeyName", default)]
-    pub last_name: Option<String>,
-    #[serde(rename = "Prefix", alias = "NamesBeforeKeyName", default)]
-    pub first_name: Option<String>,
+    pub contact_name: Option<&'a str>,
+    pub full_name: &'a str,
+    pub last_name: Option<&'a str>,
+    pub first_name: Option<&'a str>,
 }
 
-impl BwarmEntry for Party {
+impl BwarmEntry for Party<'_> {
     fn filename() -> String {
         "parties.tsv".into()
     }
@@ -61,19 +52,34 @@ impl BwarmEntry for Party {
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = Party {
+            id: fields[0].parse::<i64>()?,
+            isni: fields.get(1),
+            ipi: fields[2].parse::<i64>().ok(),
+            email: fields.get(10),
+            cisac_id: fields.get(3),
+            dpid: fields.get(4),
+            contact_name: fields.get(9),
+            full_name: &fields[5],
+            last_name: fields.get(7),
+            first_name: fields.get(6),
+        };
         _ = stmt
             .execute(params!(
-                self.id,
-                self.email.as_deref(),
-                self.isni.as_deref(),
-                self.cisac_id.as_deref(),
-                self.dpid.as_deref(),
-                self.ipi,
-                self.contact_name.as_deref(),
-                self.full_name.as_str(),
-                self.first_name.as_deref(),
-                self.last_name.as_deref(),
+                x.id,
+                x.email,
+                x.isni,
+                x.cisac_id,
+                x.dpid,
+                x.ipi,
+                x.contact_name,
+                x.full_name,
+                x.first_name,
+                x.last_name,
             ))
             .await?;
         Ok(())

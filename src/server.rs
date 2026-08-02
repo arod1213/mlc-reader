@@ -55,8 +55,9 @@ pub fn save_doc<T: BwarmEntry>(
     let outpath = PathBuf::from(T::filename());
     let output = File::create(outpath)?;
 
-    let mut reader = BufReader::new(file);
-    let mut writer = BufWriter::new(output);
+    let capacity = 128 * 1024;
+    let mut reader = BufReader::with_capacity(capacity, file);
+    let mut writer = BufWriter::with_capacity(capacity, output);
     io::copy(&mut reader, &mut writer)?;
     Ok(())
 }

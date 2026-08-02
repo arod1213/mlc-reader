@@ -1,7 +1,6 @@
-use std::{error::Error, fs::File, path::Path};
+use std::{fs::File, path::Path};
 
-use libsql::{Connection, Transaction, params};
-use serde::de::DeserializeOwned;
+use libsql::{Connection, params};
 
 use crate::bwarm::{
     interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
@@ -21,10 +20,13 @@ pub async fn setup_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
     Ok(())
 }
 
-pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
-    tx: &Transaction,
+pub async fn save_object<'r, T>(
+    conn: &Connection,
     bwarm_dir: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
+where
+    T: 'r + BwarmEntry,
+{
     let fullpath = bwarm_dir.join(T::filename());
 
     let file = File::open(fullpath)?;
@@ -33,28 +35,16 @@ pub async fn save_object<T: BwarmEntry + DeserializeOwned>(
         .flexible(true)
         .has_headers(true)
         .from_reader(file);
-    let headers = rdr.headers()?.clone();
 
-    let mut stmt = T::prepare(tx).await?;
+    let mut stmt = T::prepare(conn).await?;
     let mut sum = 0;
     for entry in rdr.records() {
-        let mut x = entry?;
-        while x.len() < headers.len() {
-            x.push_field("");
-        }
-
-        let obj = match x.deserialize::<T>(Some(&headers)) {
-            Ok(x) => x,
-            Err(e) => {
-                eprintln!("error: {e}\nfrom: {:?}", x);
-                continue;
-            }
-        };
-        obj.insert(&mut stmt).await?;
+        let entry = entry?;
+        T::insert_from_csv(&entry, &mut stmt).await?;
         stmt.reset();
         sum += 1;
     }
-    println!("INSERTED {}", sum);
+    println!("inserted {sum}");
     Ok(())
 }
 

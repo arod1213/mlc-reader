@@ -1,19 +1,17 @@
+use csv::StringRecord;
 use libsql::params;
 use serde::{Deserialize, Serialize};
 
 use crate::bwarm::interface::BwarmEntry;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct WorkResource {
-    #[serde(rename = "#LinkRecordId")]
+pub struct WorkResource<'a> {
     pub id: u64,
-    #[serde(rename = "MusicalWorkRecordId")]
-    pub work_id: String,
-    #[serde(rename = "ResourceRecordId")]
-    pub resource_id: String,
+    pub work_id: &'a str,
+    pub resource_id: &'a str,
 }
 
-impl BwarmEntry for WorkResource {
+impl BwarmEntry for WorkResource<'_> {
     fn filename() -> String {
         "workresourcelinks.tsv".into()
     }
@@ -44,13 +42,17 @@ impl BwarmEntry for WorkResource {
         Ok(stmt)
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = WorkResource {
+            id: fields[0].parse::<u64>()?,
+            work_id: &fields[1],
+            resource_id: &fields[2],
+        };
         _ = stmt
-            .execute(params!(
-                self.id.clone(),
-                self.work_id.clone(),
-                self.resource_id.clone(),
-            ))
+            .execute(params!(x.id, x.work_id, x.resource_id,))
             .await?;
         Ok(())
     }

@@ -17,6 +17,8 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
     println!("dir is {:?}", dir);
+
+    // TODO: make multithreaded (too slow rn)
     server::save_doc::<Resource>(&sftp, &dir).expect("failed to save Resources");
     server::save_doc::<Release>(&sftp, &dir).expect("failed to save Releases");
     server::save_doc::<Work>(&sftp, &dir).expect("failed to save Works");
@@ -46,26 +48,14 @@ pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
         .await
         .expect("failed to setup transaction");
 
-    let res = async {
-        save_object::<Release>(&tx, bwarm_dir).await?;
-        save_object::<Resource>(&tx, bwarm_dir).await?;
-        save_object::<Party>(&tx, bwarm_dir).await?;
-        save_object::<Work>(&tx, bwarm_dir).await?;
-        save_object::<WorkResource>(&tx, bwarm_dir).await?;
-        save_object::<Share>(&tx, bwarm_dir).await?;
-        Ok::<_, Box<dyn std::error::Error>>(())
-    }
-    .await;
-    match res {
-        Ok(_) => {
-            tx.commit().await.expect("failed to commit");
-            println!("inserted BWARM");
-        }
-        Err(e) => {
-            tx.rollback().await.expect("failed to rollback");
-            println!("failed: {}", e);
-        }
-    }
+    save_object::<Release>(&tx, bwarm_dir).await.unwrap();
+    save_object::<Resource>(&tx, bwarm_dir).await.unwrap();
+    save_object::<Party>(&tx, bwarm_dir).await.unwrap();
+    save_object::<Work>(&tx, bwarm_dir).await.unwrap();
+    save_object::<WorkResource>(&tx, bwarm_dir).await.unwrap();
+    save_object::<Share>(&tx, bwarm_dir).await.unwrap();
+
+    tx.commit().await.expect("failed to commit");
 }
 
 /// add new tables and indexes

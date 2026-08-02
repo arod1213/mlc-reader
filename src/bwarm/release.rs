@@ -1,34 +1,19 @@
 use crate::bwarm::interface::BwarmEntry;
-use chrono::{NaiveDate, NaiveTime};
+use csv::StringRecord;
 use libsql::params;
 use serde::{Deserialize, Serialize};
 
-fn date_yyyy_mm_dd<'de, D>(deserializer: D) -> Result<Option<NaiveDate>, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let text = String::deserialize(deserializer)?;
-    // NaiveDate::parse_from_str(&text, "%y-%m-%d").map_err(|e| de::Error::custom(e.to_string()))
-    Ok(NaiveDate::parse_from_str(&text, "%Y-%m-%d").ok())
-}
-
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Release {
-    #[serde(rename = "#ReleaseRecordId")]
+pub struct Release<'a> {
     pub id: i64,
-    #[serde(rename = "ReleaseTitle")]
-    pub title: String,
-    #[serde(rename = "DisplayArtistName")]
-    pub artist_name: String,
-    #[serde(rename = "LabelName")]
-    pub label_name: String,
-    #[serde(rename = "ReleaseDate", deserialize_with = "date_yyyy_mm_dd")]
-    pub release_date: Option<NaiveDate>,
-    #[serde(rename = "DistributorName")]
-    pub distro_name: String,
+    pub title: &'a str,
+    pub artist_name: &'a str,
+    pub label_name: &'a str,
+    pub release_date: Option<&'a str>,
+    pub distro_name: &'a str,
 }
 
-impl BwarmEntry for Release {
+impl<'a> BwarmEntry for Release<'a> {
     fn filename() -> String {
         "releases.tsv".into()
     }
@@ -69,19 +54,26 @@ impl BwarmEntry for Release {
         Ok(stmt)
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
-        let utc_time = self
-            .release_date
-            .map(|x: NaiveDate| x.and_time(NaiveTime::default()).and_utc().timestamp());
-
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = Release {
+            id: fields[0].parse::<i64>()?,
+            title: &fields[2],
+            artist_name: &fields[5],
+            label_name: &fields[7],
+            release_date: fields.get(9),
+            distro_name: &fields[8],
+        };
         _ = stmt
             .execute(params!(
-                self.id,
-                self.title.as_str(),
-                self.artist_name.as_str(),
-                self.distro_name.as_str(),
-                utc_time,
-                self.label_name.as_str(),
+                x.id,
+                x.title,
+                x.artist_name,
+                x.distro_name,
+                x.release_date,
+                x.label_name,
             ))
             .await?;
         Ok(())

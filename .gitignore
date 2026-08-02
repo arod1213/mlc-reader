@@ -1,7 +1,12 @@
 /target
+.DS_Store
 *.codex
+*.txt
 *.env
 *.db
 *.sql
+*.tsv
+*.db-wal
+*.db-shm
 Sample Data/
 /mlc-bwarm

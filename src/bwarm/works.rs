@@ -1,44 +1,22 @@
 use crate::bwarm::interface::BwarmEntry;
+use csv::StringRecord;
 use libsql::params;
-use serde::{Deserialize, Deserializer, Serialize, de};
-
-fn named_bool<'de, D>(deserializer: D) -> Result<bool, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let res = String::deserialize(deserializer)?;
-    match res.trim().to_uppercase().as_str() {
-        "TRUE" => Ok(true),
-        "FALSE" => Ok(false),
-        _ => Err(de::Error::custom(format!("invalid bool {res}"))),
-    }
-}
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
-pub struct Work {
-    #[serde(rename = "#MusicalWorkRecordId")]
-    pub id: String,
-    #[serde(rename = "MusicalWorkTitle")]
-    pub title: String,
-    #[serde(rename = "NominalDuration", default)]
+pub struct Work<'a> {
+    pub id: &'a str,
+    pub title: &'a str,
     pub duration_ms: Option<f64>,
-    #[serde(rename = "ISWC")]
-    pub iswc: Option<String>,
-    #[serde(rename = "HasRightShareInDispute", deserialize_with = "named_bool")]
+    pub iswc: Option<&'a str>,
     pub in_dispute: bool,
-    #[serde(rename = "AlternativeMusicalWorkIdForUsStatutoryReversion")]
     pub alt_id: Option<i64>,
-    #[serde(
-        rename = "IsArrangementOfTraditionalWork",
-        deserialize_with = "named_bool"
-    )]
     pub is_arrangement: bool,
-    #[serde(rename = "TerritoryOfPublicDomain")]
     /// String because the MLC and DDEX are idiots who cant conform to a simple standard
-    pub territory: Option<String>,
+    pub territory: Option<&'a str>,
 }
 
-impl BwarmEntry for Work {
+impl BwarmEntry for Work<'_> {
     fn filename() -> String {
         "musicalworks.tsv".into()
     }
@@ -83,17 +61,30 @@ impl BwarmEntry for Work {
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = Work {
+            id: &fields[0],
+            iswc: fields.get(1),
+            title: &fields[2],
+            duration_ms: fields[6].parse::<f64>().ok(),
+            in_dispute: &fields[7] == "TRUE",
+            alt_id: fields[10].parse().ok(),
+            is_arrangement: &fields[9] == "TRUE",
+            territory: fields.get(8),
+        };
         _ = stmt
             .execute(params!(
-                self.id.clone(),
-                self.title.clone(),
-                self.duration_ms,
-                self.iswc.clone(),
-                (self.in_dispute as i64),
-                self.alt_id,
-                (self.is_arrangement as i64),
-                self.territory.as_deref(),
+                x.id,
+                x.title,
+                x.duration_ms,
+                x.iswc,
+                (x.in_dispute as i64),
+                x.alt_id,
+                (x.is_arrangement as i64),
+                x.territory,
             ))
             .await?;
         Ok(())

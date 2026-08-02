@@ -1,3 +1,4 @@
+use csv::StringRecord;
 use libsql::params;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
@@ -19,31 +20,37 @@ pub enum PartyRole {
     SubLyricist,
     Translator,
     Adapter,
+    SubArranger,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Share {
-    #[serde(rename = "#MusicalWorkRightShareRecordId")]
-    pub id: String,
-    #[serde(rename = "MusicalWorkRecordId")]
-    pub work_id: String,
-    #[serde(rename = "PartyRecordId")]
+pub struct Share<'a> {
+    pub id: &'a str,
+    pub work_id: &'a str,
     pub party_id: i64,
-    #[serde(rename = "PartyRole")]
-    pub role: PartyRole,
-    #[serde(rename = "RightShareType")]
-    pub share_type: Option<String>,
-    #[serde(rename = "RightsType")]
-    pub rights_type: Option<String>,
-    #[serde(rename = "RightSharePercentage")]
+    pub role: &'a str,
+    pub rights_type: Option<&'a str>,
     pub share: Option<f64>,
-    #[serde(rename = "TerritoryCode")]
-    pub territory: String,
-    #[serde(rename = "PrecedingMusicalWorkRightShareRecordId")]
-    pub preceding_id: Option<String>,
+    pub territory: &'a str,
+    pub preceding_id: Option<&'a str>,
 }
 
-impl BwarmEntry for Share {
+impl<'a> Share<'a> {
+    pub fn from_csv<'r>(fields: &'r StringRecord) -> Result<Share<'r>, Box<dyn std::error::Error>> {
+        Ok(Share {
+            id: &fields[0],
+            work_id: &fields[1],
+            party_id: fields[2].parse::<i64>()?,
+            role: &fields[3],
+            share: fields[4].parse::<f64>().ok(),
+            rights_type: fields.get(5),
+            territory: &fields[9],
+            preceding_id: fields.get(8),
+        })
+    }
+}
+
+impl BwarmEntry for Share<'_> {
     fn filename() -> String {
         "musicalworkrightshares.tsv".into()
     }
@@ -55,7 +62,6 @@ impl BwarmEntry for Share {
            work_id TEXT NOT NULL REFERENCES works(id),
            party_id INTEGER NOT NULL REFERENCES parties(id),
            role TEXT NOT NULL,
-           share_type TEXT,
            rights_type TEXT,
            share REAL NOT NULL,
            territory TEXT NOT NULL,
@@ -72,7 +78,6 @@ impl BwarmEntry for Share {
            work_id,
            party_id,
            role,
-           share_type,
            rights_type,
            share,
            territory,
@@ -85,24 +90,35 @@ impl BwarmEntry for Share {
            ?5,
            ?6,
            ?7,
-           ?8,
-           ?9
+           ?8
         )";
         conn.prepare(sql).await
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = Share {
+            id: &fields[0],
+            work_id: &fields[1],
+            party_id: fields[2].parse::<i64>()?,
+            role: &fields[3],
+            share: fields[4].parse::<f64>().ok(),
+            rights_type: fields.get(5),
+            territory: &fields[9],
+            preceding_id: fields.get(8),
+        };
         _ = stmt
             .execute(params!(
-                self.id.clone(),
-                self.work_id.clone(),
-                self.party_id,
-                self.role.to_string(),
-                self.share_type.clone(),
-                self.rights_type.clone(),
-                self.share.unwrap_or_default(),
-                self.territory.clone(),
-                self.preceding_id.clone(),
+                x.id,
+                x.work_id,
+                x.party_id,
+                x.role,
+                x.rights_type,
+                x.share.unwrap_or_default(),
+                x.territory,
+                x.preceding_id,
             ))
             .await?;
         Ok(())

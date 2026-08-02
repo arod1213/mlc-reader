@@ -1,29 +1,35 @@
+use csv::StringRecord;
 use libsql::params;
-use musicmeta::isrc::Isrc;
 use serde::{Deserialize, Serialize};
 
 use crate::bwarm::interface::BwarmEntry;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct Resource {
-    // if unmatched add field
-    #[serde(rename = "#ResourceRecordId", alias = "#UnmatchedResourceRecordId")]
-    pub id: String,
-    #[serde(rename = "OriginalDataProviderName")]
-    pub data_provider: String,
-    #[serde(rename = "ReleaseRecordId")]
+pub struct Resource<'a> {
+    pub id: &'a str,
+    pub data_provider: &'a str,
     pub release_id: u64,
-    #[serde(rename = "ResourceType")]
-    pub resource_type: String,
-    #[serde(rename = "ISRC")]
-    pub isrc: Option<Isrc>,
-    #[serde(rename = "Title")]
-    pub title: String,
-
-    #[serde(default)]
-    pub is_matched: bool,
+    pub resource_type: &'a str,
+    pub isrc: Option<&'a str>,
+    pub title: &'a str,
 }
-impl BwarmEntry for Resource {
+
+impl Resource<'_> {
+    pub fn from_csv<'r>(
+        fields: &'r StringRecord,
+    ) -> Result<Resource<'r>, Box<dyn std::error::Error>> {
+        Ok(Resource {
+            id: &fields[0],
+            data_provider: &fields[14],
+            release_id: fields[11].parse::<u64>()?,
+            resource_type: &fields[1],
+            isrc: fields.get(2),
+            title: &fields[3],
+        })
+    }
+}
+
+impl BwarmEntry for Resource<'_> {
     fn filename() -> String {
         "resources.tsv".into()
     }
@@ -60,14 +66,25 @@ impl BwarmEntry for Resource {
         Ok(stmt)
     }
 
-    async fn insert(&self, stmt: &mut libsql::Statement) -> Result<(), libsql::Error> {
+    async fn insert_from_csv(
+        fields: &StringRecord,
+        stmt: &mut libsql::Statement,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let x = Resource {
+            id: &fields[0],
+            data_provider: &fields[14],
+            release_id: fields[11].parse::<u64>()?,
+            resource_type: &fields[1],
+            isrc: fields.get(2),
+            title: &fields[3],
+        };
         _ = stmt
             .execute(params!(
-                self.id.clone(),
-                self.data_provider.clone(),
-                self.release_id,
-                self.isrc.as_ref().map(|x| x.to_string()),
-                self.title.clone(),
+                x.id,
+                x.data_provider,
+                x.release_id,
+                x.isrc,
+                x.title,
             ))
             .await?;
         Ok(())

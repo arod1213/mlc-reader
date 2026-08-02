@@ -9,7 +9,8 @@ DATA_PATH="./mlc-bwarm"
 
 cargo build --release
 BIN="./target/release/mlc-reader"
-$BIN save
+
+# $BIN save
 $BIN migrate -p "$DATA_PATH"
 
 $BIN modify
