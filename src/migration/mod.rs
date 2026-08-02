@@ -29,9 +29,13 @@ pub fn save_remote_mlc_docs(cred: &Credential) {
 
 pub async fn trim_db(conn: &Connection) -> Result<(), libsql::Error> {
     trim::trim_shares(conn).await?;
+    println!("trimmed shares");
     trim::trim_works(conn).await?;
+    println!("trimmed works");
     trim::trim_releases(conn).await?;
+    println!("trimmed releases");
     trim::trim_parties(conn).await?;
+    println!("trimmed parties");
     _ = conn.execute("VACUUM", params!()).await?;
     Ok(())
 }
@@ -74,6 +78,7 @@ pub async fn create_indexes(conn: &Connection) -> Result<(), libsql::Error> {
     create_share_index(conn).await?;
     create_relation_index(conn).await?;
     create_work_indexes(conn).await?;
+    create_resource_index(conn).await?;
     Ok(())
 }
 
@@ -310,7 +315,29 @@ async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
+// CREATE INDEX IF NOT EXISTS idx_resources_release_id_id
+// ON resources(release_id, id);
+//
+// CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id
+// ON work_resources(resource_id);
 
+async fn create_resource_index(conn: &Connection) -> Result<(), libsql::Error> {
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id 
+ON resources(release_id, id)",
+            params!(),
+        )
+        .await?;
+    _ = conn
+        .execute(
+            "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id
+ON work_resources(resource_id);",
+            params!(),
+        )
+        .await?;
+    Ok(())
+}
 async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
     _ = conn
         .execute(
