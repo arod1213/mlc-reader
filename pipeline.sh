@@ -13,7 +13,7 @@ BIN="./target/release/mlc-reader"
 # $BIN save
 $BIN migrate -p "$DATA_PATH"
 $BIN trim --vacuum
-#$BIN index-search
+$BIN index-search
 
 #$BIN enrich -m writer > /dev/null
 #$BIN enrich -m publisher > /dev/null
