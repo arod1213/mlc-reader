@@ -63,10 +63,10 @@ pub async fn search_parties(
                         SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
                         FROM parties p
                         JOIN parties_fts ON parties_fts.rowid = p.id
-                        WHERE p.ipi IS NOT NULL
-                        AND parties_fts MATCH ?
-                        AND (p.role = ? OR p.role IS NULL OR p.role = 'both')
-                        LIMIT ?";
+                        WHERE parties_fts MATCH ?1 || '*'
+                        AND p.ipi IS NOT NULL
+                        AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
+                        LIMIT ?3";
                     conn.query(sql, params!(clean_name, x.to_string(), limit as i64))
                         .await?
                 }
@@ -75,9 +75,9 @@ pub async fn search_parties(
                         SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
                         FROM parties p
                         JOIN parties_fts ON parties_fts.rowid = p.id
-                        WHERE p.ipi IS NOT NULL
-                        AND parties_fts MATCH ?
-                        LIMIT ?";
+                        WHERE parties_fts MATCH ?1 || '*'
+                        AND p.ipi IS NOT NULL
+                        LIMIT ?2";
                     conn.query(sql, params!(clean_name, limit as i64)).await?
                 }
             }
@@ -87,9 +87,9 @@ pub async fn search_parties(
                 let sql = "
                 SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
                 FROM parties p
-                WHERE p.ipi = ?
-                AND (p.role = ? OR p.role IS NULL OR p.role = 'both')
-                LIMIT ?";
+                WHERE p.ipi = ?1
+                AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
+                LIMIT ?3";
                 conn.query(sql, params!(ipi.0 as i64, x.to_string(), limit as i64))
                     .await?
             }
@@ -97,8 +97,8 @@ pub async fn search_parties(
                 let sql = "
                 SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
                 FROM parties p
-                WHERE p.ipi = ?
-                LIMIT ?";
+                WHERE p.ipi = ?1
+                LIMIT ?2";
                 conn.query(sql, params!(ipi.0 as i64, limit as i64)).await?
             }
         },

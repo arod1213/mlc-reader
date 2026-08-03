@@ -24,7 +24,7 @@ pub struct Share {
     pub id: String,
     pub party_id: u64,
     pub role: String,
-    pub share_type: Option<String>,
+    // pub share_type: Option<String>,
     pub rights_type: Option<String>,
     pub share: f64,
     pub preceding_id: Option<String>,
@@ -268,7 +268,6 @@ pub async fn get_works_parties(
                             'id', s.id,
                             'party_id', p.id,
                             'role', s.role,
-                            'share_type', s.share_type,
                             'rights_type', s.rights_type,
                             'share', s.share,
                             'preceding_id', s.preceding_id

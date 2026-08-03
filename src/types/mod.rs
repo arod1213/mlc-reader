@@ -1,5 +1,6 @@
 use std::{fmt::Display, str::FromStr};
 
+use clap::ValueEnum;
 use musicmeta::{ipi::IpiNameNum, tis::society::TisSocietyCode};
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +23,7 @@ pub struct Party {
     pub role: Option<Role>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, ValueEnum)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
     Publisher,

@@ -35,21 +35,6 @@ pub struct Share<'a> {
     pub preceding_id: Option<&'a str>,
 }
 
-impl<'a> Share<'a> {
-    pub fn from_csv<'r>(fields: &'r StringRecord) -> Result<Share<'r>, Box<dyn std::error::Error>> {
-        Ok(Share {
-            id: fields.get(0).ok_or("missing id")?,
-            work_id: fields.get(1).ok_or("missing work id")?,
-            party_id: fields.get(2).ok_or("missing party id")?.parse::<i64>()?,
-            role: fields.get(3).ok_or("missing role")?,
-            share: fields.get(4).and_then(|x| x.parse::<f64>().ok()),
-            rights_type: fields.get(5),
-            territory: fields.get(9).ok_or("missing territory")?,
-            preceding_id: fields.get(8),
-        })
-    }
-}
-
 impl BwarmEntry for Share<'_> {
     fn filename() -> String {
         "musicalworkrightshares.tsv".into()
@@ -106,7 +91,7 @@ impl BwarmEntry for Share<'_> {
             role: fields.get(3).ok_or("missing role")?,
             share: fields.get(4).and_then(|x| x.parse::<f64>().ok()),
             rights_type: fields.get(5),
-            territory: fields.get(9).ok_or("missing territory")?,
+            territory: fields.get(7).ok_or("missing territory")?,
             preceding_id: fields.get(8),
         };
         _ = stmt

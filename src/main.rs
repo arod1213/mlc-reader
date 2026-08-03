@@ -3,9 +3,10 @@ use dotenv::dotenv;
 use libsql::Builder;
 use mlc_reader::migration::trim_db;
 use mlc_reader::migration::utils::disable_fk;
-use mlc_reader::mutations::parties::top_unsigned_writers;
+use mlc_reader::mutations::parties::{search_parties, top_unsigned_writers};
 use mlc_reader::mutations::relations;
 use mlc_reader::mutations::works::{self, WorkSearchParams};
+use mlc_reader::types::Role;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use musicmeta::ipi::IpiNameNum;
 use serde::Deserialize;
@@ -36,17 +37,21 @@ async fn main() {
             let res = top_unsigned_writers(&conn).await.unwrap();
             dbg!(res);
         }
-        Command::GetWork { id } => {
-            let res = works::get_works(&conn, &[id]).await.unwrap();
-            dbg!(res);
-        }
         Command::Relation { id } => {
             let res = relations::get_writer_collaborators(&conn, id, 0)
                 .await
                 .unwrap();
             dbg!(res);
         }
-        Command::FindWork { artist, name, ipi } => {
+        Command::PartySearch { input, role } => {
+            let res = search_parties(&conn, input.into(), role, 30).await.unwrap();
+            dbg!(res);
+        }
+        Command::Work { id } => {
+            let res = works::get_works(&conn, &[id]).await.unwrap();
+            dbg!(res);
+        }
+        Command::WorkSearch { artist, name, ipi } => {
             let q = WorkSearchParams {
                 title: name,
                 artist,
@@ -129,11 +134,17 @@ pub struct Args {
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Talent {},
-    GetWork {
+    Work {
         #[arg(short, long)]
         id: String,
     },
-    FindWork {
+    PartySearch {
+        #[arg(short, long)]
+        input: String,
+        #[arg(short, long)]
+        role: Option<Role>,
+    },
+    WorkSearch {
         #[arg(short, long)]
         ipi: Option<IpiNameNum>,
         #[arg(short, long)]
