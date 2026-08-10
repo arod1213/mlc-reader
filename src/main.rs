@@ -65,14 +65,14 @@ async fn main() {
             dbg!(res);
         }
         // save MLC BWARM TSV files onto disk
-        Command::Save {} => {
+        Command::Save { path } => {
             let cred = Credential {
                 host: env::var("MLC_HOST").expect("missing MLC_HOST"),
                 username: env::var("MLC_USER").expect("missing MLC_USER"),
                 public_key: env::var("MLC_PUBLIC_KEY").unwrap().into(),
                 private_key: env::var("MLC_PRIVATE_KEY").unwrap().into(),
             };
-            migration::save_remote_mlc_docs(&cred);
+            migration::save_remote_mlc_docs(&cred, &path);
         }
         // save MLC BWARM TSV files into DB
         Command::Migrate { path } => {
@@ -156,7 +156,10 @@ pub enum Command {
         #[arg(short, long)]
         id: i64,
     },
-    Save {},
+    Save {
+        #[arg(short, long)]
+        path: PathBuf,
+    },
     Migrate {
         #[arg(short, long)]
         path: PathBuf,

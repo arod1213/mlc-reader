@@ -48,11 +48,12 @@ pub fn latest_dir(ftp: &Sftp) -> Option<PathBuf> {
 pub fn save_doc<T: BwarmEntry>(
     ftp: &Sftp,
     in_dir: &Path,
+    out_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let latest_file = in_dir.join(T::filename());
     println!("looking for {:?}", latest_file);
     let file = ftp.open(latest_file)?;
-    let outpath = PathBuf::from(T::filename());
+    let outpath = out_dir.join(T::filename());
     let output = File::create(outpath)?;
 
     let capacity = 128 * 1024;

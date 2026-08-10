@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# cargo run -- save && \
-
-DATA_PATH="./mlc-sample"
+#DATA_PATH="./mlc-sample"
 #DATA_PATH="./Sample Data"
-#DATA_PATH="./mlc-bwarm"
+DATA_PATH="./mlc-bwarm"
+
+cargo run -- save -p $DATA_PATH && \
+
 
 cargo build --release
 BIN="./target/release/mlc-reader"

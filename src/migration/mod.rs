@@ -10,24 +10,24 @@ use crate::{
     server::{self, Credential},
 };
 use libsql::{Connection, params};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 mod trim;
 pub mod utils;
 
 /// save TSV files from SFTP
-pub fn save_remote_mlc_docs(cred: &Credential) {
+pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &PathBuf) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
     println!("dir is {:?}", dir);
 
     // TODO: make multithreaded (too slow rn)
-    server::save_doc::<Resource>(&sftp, &dir).expect("failed to save Resources");
-    server::save_doc::<Release>(&sftp, &dir).expect("failed to save Releases");
-    server::save_doc::<Work>(&sftp, &dir).expect("failed to save Works");
-    server::save_doc::<WorkResource>(&sftp, &dir).expect("failed to save WorkResources");
-    server::save_doc::<Party>(&sftp, &dir).expect("failed to save Parties");
-    server::save_doc::<Share>(&sftp, &dir).expect("failed to save Shares");
+    server::save_doc::<Resource>(&sftp, &dir, &out_dir).expect("failed to save Resources");
+    server::save_doc::<Release>(&sftp, &dir, &out_dir).expect("failed to save Releases");
+    server::save_doc::<Work>(&sftp, &dir, &out_dir).expect("failed to save Works");
+    server::save_doc::<WorkResource>(&sftp, &dir, &out_dir).expect("failed to save WorkResources");
+    server::save_doc::<Party>(&sftp, &dir, &out_dir).expect("failed to save Parties");
+    server::save_doc::<Share>(&sftp, &dir, &out_dir).expect("failed to save Shares");
 }
 
 pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
