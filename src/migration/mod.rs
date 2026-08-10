@@ -22,12 +22,12 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &PathBuf) {
     println!("dir is {:?}", dir);
 
     // TODO: make multithreaded (too slow rn)
-    server::save_doc::<Resource>(&sftp, &dir, &out_dir).expect("failed to save Resources");
-    server::save_doc::<Release>(&sftp, &dir, &out_dir).expect("failed to save Releases");
+    server::save_doc::<Party>(&sftp, &dir, &out_dir).expect("failed to save Parties");
     server::save_doc::<Work>(&sftp, &dir, &out_dir).expect("failed to save Works");
     server::save_doc::<WorkResource>(&sftp, &dir, &out_dir).expect("failed to save WorkResources");
-    server::save_doc::<Party>(&sftp, &dir, &out_dir).expect("failed to save Parties");
     server::save_doc::<Share>(&sftp, &dir, &out_dir).expect("failed to save Shares");
+    server::save_doc::<Release>(&sftp, &dir, &out_dir).expect("failed to save Releases");
+    server::save_doc::<Resource>(&sftp, &dir, &out_dir).expect("failed to save Resources");
 }
 
 pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
