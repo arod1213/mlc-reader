@@ -10,4 +10,4 @@ directory = "vendor"
 
 [net]
 git-fetch-with-cli = true
-offline = true
+#offline = true

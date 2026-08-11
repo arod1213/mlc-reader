@@ -5,13 +5,10 @@ set -euo pipefail
 #DATA_PATH="./Sample Data"
 DATA_PATH="./mlc-bwarm"
 
-cargo run -- save -p $DATA_PATH && \
-
-
 cargo build --release
 BIN="./target/release/mlc-reader"
 
-# $BIN save
+#$BIN save -p "$DATA_PATH"
 $BIN migrate -p "$DATA_PATH"
 $BIN trim --vacuum
 $BIN index-search

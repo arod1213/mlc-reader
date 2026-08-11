@@ -28,6 +28,7 @@ where
     T: 'r + BwarmEntry,
 {
     let fullpath = bwarm_dir.join(T::filename());
+    println!("about to save {:?}", fullpath);
 
     let file = File::open(fullpath)?;
     let mut rdr = csv::ReaderBuilder::new()
@@ -36,21 +37,33 @@ where
         .has_headers(true)
         .from_reader(file);
 
-    let tx = conn.transaction().await?;
+    let mut tx = conn.transaction().await?;
     let mut stmt = T::prepare(&tx).await?;
     let mut sum = 0;
 
-    println!("about to save {:?}", fullpath);
+    let batch_size = 1_000_000;
     for entry in rdr.records() {
         let entry = entry?;
         match T::insert_from_csv(&entry, &mut stmt).await {
-            Ok(_) => sum += 1,
+            Ok(_) => {
+                sum += 1;
+                if sum % batch_size == 0 {
+                    drop(stmt);
+                    tx.commit().await?;
+                    println!("@ {}", sum);
+
+                    tx = conn.transaction().await?;
+                    stmt = T::prepare(&tx).await?;
+                }
+            }
             Err(e) => {
                 eprintln!("failed to save: {e}");
             }
         };
         stmt.reset();
     }
+
+    drop(stmt);
     tx.commit().await?;
     println!("inserted {sum}");
     Ok(())
