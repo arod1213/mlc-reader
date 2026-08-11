@@ -17,7 +17,7 @@ async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::
     match is_local {
         true => Builder::new_local(url).build().await,
         false => {
-            let token = env::var("DB_TOKEN").expect("missing DB_TOKEN");
+            let token = env::var("MLC_DB_TOKEN").expect("missing MLC_DB_TOKEN");
             Builder::new_remote(url.into(), token).build().await
         }
     }
@@ -26,7 +26,7 @@ async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::
 #[tokio::main]
 async fn main() {
     dotenv().ok();
-    let db_url = env::var("DB_URL").expect("missing DB_URL");
+    let db_url = env::var("MLC_DB_URL").expect("missing MLC_DB_URL");
     let is_local = db_url.starts_with("file:");
     let db = open_db(&db_url, is_local).await.unwrap();
     let conn = db.connect().unwrap();

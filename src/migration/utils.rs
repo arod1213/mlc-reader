@@ -40,6 +40,7 @@ where
     let mut stmt = T::prepare(&tx).await?;
     let mut sum = 0;
 
+    println!("about to save {:?}", fullpath);
     for entry in rdr.records() {
         let entry = entry?;
         match T::insert_from_csv(&entry, &mut stmt).await {
