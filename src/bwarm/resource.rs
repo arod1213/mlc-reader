@@ -22,7 +22,8 @@ impl BwarmEntry for Resource<'_> {
     async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS resources (
-           id TEXT PRIMARY KEY NOT NULL,
+           -- id TEXT PRIMARY KEY NOT NULL,
+           id TEXT NOT NULL,
            data_provider TEXT NOT NULL,
            release_id INTEGER NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
            isrc TEXT,

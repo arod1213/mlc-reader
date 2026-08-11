@@ -79,6 +79,7 @@ pub async fn create_search_tables_indexes(conn: &libsql::Connection) -> Result<(
     WriterRelations::migrate(conn).await?;
     create_search_indexes(conn).await?;
     create_party_fts(conn).await?;
+    create_relation_index(conn).await?;
     Ok(())
 }
 
@@ -423,6 +424,12 @@ async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
         )
         .await?;
 
+    Ok(())
+}
+
+pub async fn create_resource_idx(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    let sql = "CREATE UNIQUE INDEX resources_id_idx ON resources_staging(id);";
+    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
 
