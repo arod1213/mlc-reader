@@ -33,22 +33,31 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) {
 pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
     trim::setup_bulk_write_mode(conn).await?;
 
+    log::info!("creating shares idx");
     create_trim_shares_indexes(conn).await?;
+    log::info!("starting to trim shares");
     trim::trim_shares(conn).await?;
-    println!("trimmed shares");
+    log::info!("trimmed shares");
 
+    log::info!("creating resource idx");
     create_resource_idx(conn).await?;
+    log::info!("creating trim_works idx");
     create_trim_works_indexes(conn).await?;
+    log::info!("starting to trim works");
     trim::trim_works(conn).await?;
-    println!("trimmed works");
+    log::info!("trimmed works");
 
+    log::info!("creating releases idx");
     create_trim_releases_indexes(conn).await?;
+    log::info!("starting to trim releases");
     trim::trim_releases(conn).await?;
-    println!("trimmed releases");
+    log::info!("trimmed releases");
 
+    log::info!("creating parties idx");
     create_trim_parties_indexes(conn).await?;
+    log::info!("starting to trim parties");
     trim::trim_parties(conn).await?;
-    println!("trimmed parties");
+    log::info!("trimmed parties");
 
     if vacuum {
         _ = conn.execute("VACUUM", params!()).await?;

@@ -26,6 +26,8 @@ async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::
 #[tokio::main]
 async fn main() {
     dotenv().ok();
+    env_logger::init();
+
     let db_url = env::var("MLC_DB_URL").expect("missing MLC_DB_URL");
     let is_local = db_url.starts_with("file:");
     let db = open_db(&db_url, is_local).await.unwrap();
