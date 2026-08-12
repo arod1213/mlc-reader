@@ -1,3 +1,13 @@
+[profile.dev]
+debug = false
+lto = "off"
+opt-level = 0
+
+[profile.release]
+panic = "abort"
+lto = "fat"
+codegen-units = 1
+
 [package]
 name = "mlc-reader"
 version = "0.1.5"

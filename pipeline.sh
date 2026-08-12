@@ -8,15 +8,13 @@ DATA_PATH="./mlc-bwarm"
 cargo build --release
 BIN="./target/release/mlc-reader"
 
-#$BIN save -p "$DATA_PATH"
+$BIN save -p "$DATA_PATH"
 $BIN migrate -p "$DATA_PATH"
-$BIN trim --vacuum
+$BIN trim # --vacuum
 $BIN index-search
 
 #$BIN enrich -m writer > /dev/null
 #$BIN enrich -m publisher > /dev/null
 #$BIN enrich -m share > /dev/null 
 
-
-# cargo run -- update -p './updates.txt' && \
-# turso db create mlc-dump --from-file './local.db'
+#$BIN update -p './updates.txt' && \
