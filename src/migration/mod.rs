@@ -36,28 +36,28 @@ pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Erro
     log::info!("creating shares idx");
     create_trim_shares_indexes(conn).await?;
     log::info!("starting to trim shares");
-    trim::trim_shares(conn).await?;
-    log::info!("trimmed shares");
+    let count = trim::trim_shares(conn).await?;
+    log::info!("trimmed {count} shares");
 
     log::info!("creating resource idx");
     create_resource_idx(conn).await?;
     log::info!("creating trim_works idx");
     create_trim_works_indexes(conn).await?;
     log::info!("starting to trim works");
-    trim::trim_works(conn).await?;
-    log::info!("trimmed works");
+    let count = trim::trim_works(conn).await?;
+    log::info!("trimmed {count} works");
 
     log::info!("creating releases idx");
     create_trim_releases_indexes(conn).await?;
     log::info!("starting to trim releases");
-    trim::trim_releases(conn).await?;
-    log::info!("trimmed releases");
+    let count = trim::trim_releases(conn).await?;
+    log::info!("trimmed {count} releases");
 
     log::info!("creating parties idx");
     create_trim_parties_indexes(conn).await?;
     log::info!("starting to trim parties");
-    trim::trim_parties(conn).await?;
-    log::info!("trimmed parties");
+    let count = trim::trim_parties(conn).await?;
+    log::info!("trimmed {count} parties");
 
     if vacuum {
         _ = conn.execute("VACUUM", params!()).await?;

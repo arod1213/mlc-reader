@@ -28,7 +28,7 @@ pub async fn setup_trim_write_mode(conn: &Connection) -> Result<(), libsql::Erro
     Ok(())
 }
 
-pub async fn trim_works(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn trim_works(conn: &Connection) -> Result<u64, libsql::Error> {
     let sql = "
         DELETE FROM works
         WHERE 
@@ -42,11 +42,10 @@ pub async fn trim_works(conn: &Connection) -> Result<(), libsql::Error> {
             WHERE wr.work_id = works.id
           )
     ";
-    conn.execute(sql, params!()).await?;
-    Ok(())
+    conn.execute(sql, params!()).await
 }
 
-pub async fn trim_shares(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn trim_shares(conn: &Connection) -> Result<u64, libsql::Error> {
     let sql = "
         DELETE FROM shares
         WHERE shares.share = 0.0
@@ -55,11 +54,10 @@ pub async fn trim_shares(conn: &Connection) -> Result<(), libsql::Error> {
           WHERE s.preceding_id = shares.id
         )
     ";
-    conn.execute(sql, params!()).await?;
-    Ok(())
+    conn.execute(sql, params!()).await
 }
 
-pub async fn trim_releases(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn trim_releases(conn: &Connection) -> Result<u64, libsql::Error> {
     let sql = "
         DELETE FROM releases
         WHERE NOT EXISTS (
@@ -68,11 +66,10 @@ pub async fn trim_releases(conn: &Connection) -> Result<(), libsql::Error> {
             WHERE r.release_id = releases.id
         )
     ";
-    conn.execute(sql, params!()).await?;
-    Ok(())
+    conn.execute(sql, params!()).await
 }
 
-pub async fn trim_parties(conn: &Connection) -> Result<(), libsql::Error> {
+pub async fn trim_parties(conn: &Connection) -> Result<u64, libsql::Error> {
     let sql = "
         DELETE FROM parties
         WHERE NOT EXISTS (
@@ -81,8 +78,7 @@ pub async fn trim_parties(conn: &Connection) -> Result<(), libsql::Error> {
         )
         AND parties.ipi IS NULL
     ";
-    conn.execute(sql, params!()).await?;
-    Ok(())
+    conn.execute(sql, params!()).await
 }
 
 // async fn delete_old_works(conn: &Connection) -> Result<(), libsql::Error> {
