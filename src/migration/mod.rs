@@ -37,6 +37,7 @@ pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Erro
     trim::trim_shares(conn).await?;
     println!("trimmed shares");
 
+    create_resource_idx(conn).await?;
     create_trim_works_indexes(conn).await?;
     trim::trim_works(conn).await?;
     println!("trimmed works");
@@ -428,7 +429,7 @@ async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
 }
 
 pub async fn create_resource_idx(conn: &libsql::Connection) -> Result<(), libsql::Error> {
-    let sql = "CREATE UNIQUE INDEX resources_id_idx ON resources_staging(id);";
+    let sql = "CREATE UNIQUE INDEX IF NOT EXISTS resources_id_idx ON resources(id);";
     _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
