@@ -31,7 +31,7 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) {
 }
 
 pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
-    trim::setup_bulk_write_mode(conn).await?;
+    trim::setup_trim_write_mode(conn).await?;
 
     log::info!("creating shares idx");
     create_trim_shares_indexes(conn).await?;

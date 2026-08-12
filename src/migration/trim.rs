@@ -17,6 +17,17 @@ pub async fn setup_bulk_write_mode(conn: &Connection) -> Result<(), libsql::Erro
     Ok(())
 }
 
+pub async fn setup_trim_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
+    run_pragma(conn, "PRAGMA foreign_keys = OFF").await?;
+    run_pragma(conn, "PRAGMA journal_mode = WAL").await?;
+    run_pragma(conn, "PRAGMA synchronous = OFF").await?;
+    run_pragma(conn, "PRAGMA temp_store = FILE").await?;
+    run_pragma(conn, "PRAGMA cache_size = -200000").await?;
+    run_pragma(conn, "PRAGMA mmap_size = 1073741824").await?;
+    run_pragma(conn, "PRAGMA busy_timeout = 60000").await?;
+    Ok(())
+}
+
 pub async fn trim_works(conn: &Connection) -> Result<(), libsql::Error> {
     let sql = "
         DELETE FROM works
