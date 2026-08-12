@@ -19,7 +19,7 @@ pub mod utils;
 pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) {
     let sftp = cred.open().unwrap();
     let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
-    println!("dir is {:?}", dir);
+    log::debug!("dir is {:?}", dir);
 
     // TODO: make multithreaded (too slow rn)
     server::save_doc::<Party>(&sftp, &dir, out_dir).expect("failed to save Parties");

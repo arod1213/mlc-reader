@@ -51,7 +51,7 @@ pub fn save_doc<T: BwarmEntry>(
     out_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let latest_file = in_dir.join(T::filename());
-    println!("looking for {:?}", latest_file);
+    log::debug!("looking for {:?}", latest_file);
     let file = ftp.open(latest_file)?;
     let outpath = out_dir.join(T::filename());
     let output = File::create(outpath)?;

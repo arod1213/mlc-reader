@@ -11,7 +11,7 @@ pub async fn update_publisher_writers(
     let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
         Ok(_) => false,
         Err(e) => {
-            eprintln!("{:?}", e);
+            log::error!("{:?}", e);
             true
         }
     };

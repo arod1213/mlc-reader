@@ -108,11 +108,11 @@ async fn main() {
             .await;
             match res {
                 Ok(_) => {
-                    eprintln!("insert succeeded");
+                    log::info!("insert succeeded");
                     tx.commit().await.unwrap()
                 }
                 Err(e) => {
-                    eprintln!("failed to insert: {}", e);
+                    log::error!("failed to insert: {}", e);
                     tx.rollback().await.unwrap()
                 }
             }

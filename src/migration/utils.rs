@@ -28,7 +28,7 @@ where
     T: 'r + BwarmEntry,
 {
     let fullpath = bwarm_dir.join(T::filename());
-    println!("about to save {:?}", fullpath);
+    log::debug!("about to save {:?}", fullpath);
 
     let file = File::open(fullpath)?;
     let mut rdr = csv::ReaderBuilder::new()
@@ -50,14 +50,14 @@ where
                 if sum % batch_size == 0 {
                     drop(stmt);
                     tx.commit().await?;
-                    println!("@ {}", sum);
+                    log::debug!("@ {}", sum);
 
                     tx = conn.transaction().await?;
                     stmt = T::prepare(&tx).await?;
                 }
             }
             Err(e) => {
-                eprintln!("failed to save: {e}");
+                log::error!("failed to save: {e}");
             }
         };
         stmt.reset();
@@ -65,7 +65,7 @@ where
 
     drop(stmt);
     tx.commit().await?;
-    println!("inserted {sum}");
+    log::info!("inserted {sum}");
     Ok(())
 }
 
