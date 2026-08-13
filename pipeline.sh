@@ -19,7 +19,7 @@ $BIN save -p "$TSV_STORAGE_PATH"
 $BIN migrate -p "$TSV_STORAGE_PATH"
 $BIN trim # --vacuum
 $BIN index-search
-$BIN enrich -m writer > /dev/null
-$BIN enrich -m publisher > /dev/null
-$BIN enrich -m share > /dev/null 
+$BIN enrich -m writer
+$BIN enrich -m publisher
+$BIN enrich -m share
 $BIN update -p './updates.txt'
