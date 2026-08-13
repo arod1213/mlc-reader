@@ -21,5 +21,6 @@ $BIN trim # --vacuum
 $BIN index-search
 $BIN enrich -m writer
 $BIN enrich -m publisher
+$BIN enrich -m role
 $BIN enrich -m share
 $BIN update -p './updates.txt'
