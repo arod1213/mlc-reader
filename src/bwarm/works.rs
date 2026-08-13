@@ -24,7 +24,7 @@ impl BwarmEntry for Work<'_> {
     async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS works (
-           id TEXT PRIMARY KEY NOT NULL,
+           id TEXT NOT NULL,
            title TEXT NOT NULL,
            duration_ms REAL,
            iswc TEXT,

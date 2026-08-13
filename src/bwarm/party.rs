@@ -88,7 +88,7 @@ impl BwarmEntry for Party<'_> {
     async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS parties (
-           id INTEGER PRIMARY KEY NOT NULL,
+           id INTEGER NOT NULL,
            email TEXT,
            isni TEXT,
            cisac_id TEXT,

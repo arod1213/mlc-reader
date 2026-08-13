@@ -43,7 +43,7 @@ impl BwarmEntry for Share<'_> {
     async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS shares (
-           id TEXT PRIMARY KEY NOT NULL,
+           id TEXT NOT NULL,
            work_id TEXT NOT NULL REFERENCES works(id),
            party_id INTEGER NOT NULL REFERENCES parties(id),
            role TEXT NOT NULL,

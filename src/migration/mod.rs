@@ -4,6 +4,7 @@ use crate::{
         work_resource::WorkResource, works::Work,
     },
     migration::{
+        pks::{create_party_pk, create_resource_pk, create_share_pk, create_work_pk},
         trim::setup_bulk_write_mode,
         utils::{disable_fk, migrate_schema, save_object},
     },
@@ -12,6 +13,7 @@ use crate::{
 use libsql::{Connection, params};
 use std::path::Path;
 
+mod pks;
 mod trim;
 pub mod utils;
 
@@ -35,14 +37,18 @@ pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Erro
 
     log::info!("creating shares idx");
     create_trim_shares_indexes(conn).await?;
+    log::info!("creating resource pk");
+    create_share_pk(conn).await?;
     log::info!("starting to trim shares");
     let count = trim::trim_shares(conn).await?;
     log::info!("trimmed {count} shares");
 
-    log::info!("creating resource idx");
-    create_resource_idx(conn).await?;
+    log::info!("creating resource pk");
+    create_resource_pk(conn).await?;
     log::info!("creating trim_works idx");
     create_trim_works_indexes(conn).await?;
+    log::info!("creating works pk");
+    create_work_pk(conn).await?;
     log::info!("starting to trim works");
     let count = trim::trim_works(conn).await?;
     log::info!("trimmed {count} works");
@@ -53,6 +59,8 @@ pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Erro
     let count = trim::trim_releases(conn).await?;
     log::info!("trimmed {count} releases");
 
+    log::info!("creating parties pk");
+    create_party_pk(conn).await?;
     log::info!("creating parties idx");
     create_trim_parties_indexes(conn).await?;
     log::info!("starting to trim parties");
@@ -85,19 +93,30 @@ pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
 /// add new tables and indexes
 pub async fn create_search_tables_indexes(conn: &libsql::Connection) -> Result<(), libsql::Error> {
     // modify_parties_migration(conn)?;
+    log::info!("creating publisher relations");
     PublisherRelations::migrate(conn).await?;
+    log::info!("creating writer relations");
     WriterRelations::migrate(conn).await?;
+    log::info!("creating search index");
     create_search_indexes(conn).await?;
+    log::info!("creating party fts");
     create_party_fts(conn).await?;
+    log::info!("creating relation index");
     create_relation_index(conn).await?;
+    log::info!("finished indexes");
     Ok(())
 }
 
 pub async fn create_search_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+    log::info!("creating publisher relation index");
     create_publisher_relation_index(conn).await?;
+    log::info!("creating party index");
     create_party_indexes(conn).await?;
+    log::info!("creating share index");
     create_share_index(conn).await?;
+    log::info!("creating relation index");
     create_relation_index(conn).await?;
+    log::info!("creating work index");
     create_work_indexes(conn).await?;
     Ok(())
 }
@@ -434,12 +453,6 @@ async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
         )
         .await?;
 
-    Ok(())
-}
-
-pub async fn create_resource_idx(conn: &libsql::Connection) -> Result<(), libsql::Error> {
-    let sql = "CREATE UNIQUE INDEX IF NOT EXISTS resources_id_idx ON resources(id);";
-    _ = conn.execute(sql, params!()).await?;
     Ok(())
 }
 
