@@ -57,7 +57,9 @@ pub struct Release {
 pub struct WorkSearchParams {
     pub iswc: Option<Iswc>,
     pub isrc: Option<Isrc>,
-    pub title: Option<String>,
+    // to avoid dynamic sql this is not null
+    // TODO: make this optional and use query builder
+    pub title: String,
     pub artist: Option<String>,
     // to avoid dynamic sql this is not null
     // TODO: make this optional and use query builder
@@ -74,10 +76,13 @@ pub async fn search_works(
     let sql = "
         WITH matched_works AS (
           SELECT wk.id
-          FROM works wk
+          FROM parties p
+          JOIN shares s ON s.party_id = p.id
+          JOIN works wk ON wk.id = s.work_id
           WHERE 1 = 1
             AND (?1 IS NULL OR wk.iswc = ?1)
-            AND (?2 IS NULL OR wk.title = ?2)
+            AND wk.title LIKE ?2
+            AND p.ipi = ?5
             AND (
               ?3 IS NULL OR EXISTS (
                 SELECT 1
@@ -96,13 +101,6 @@ pub async fn search_works(
                 WHERE wr.work_id = wk.id
                     AND rs.isrc = ?4
               )
-            )
-            AND EXISTS (
-                SELECT 1
-                FROM shares s
-                JOIN parties p ON p.id = s.party_id
-                WHERE s.work_id = wk.id
-                  AND p.ipi = ?5
             )
           LIMIT ?6 OFFSET ?7
         )
@@ -139,7 +137,7 @@ pub async fn search_works(
             sql,
             params!(
                 q.iswc.map(|x| x.to_string()),
-                q.title.map(|x| x.to_uppercase()),
+                q.title.to_uppercase(),
                 q.artist.map(|x| x.to_uppercase()),
                 q.isrc.map(|x| x.to_string()),
                 q.party_ipi.0 as i64,

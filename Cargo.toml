@@ -10,7 +10,7 @@ codegen-units = 1
 
 [package]
 name = "mlc-reader"
-version = "0.1.6"
+version = "0.1.7"
 edition = "2024"
 
 [dependencies]

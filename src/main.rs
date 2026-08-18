@@ -150,7 +150,7 @@ pub enum Command {
         #[arg(short, long)]
         ipi: IpiNameNum,
         #[arg(short, long)]
-        name: Option<String>,
+        name: String,
         #[arg(short, long)]
         artist: Option<String>,
     },
