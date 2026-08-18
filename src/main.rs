@@ -57,11 +57,11 @@ async fn main() {
             let q = WorkSearchParams {
                 title: name,
                 artist,
-                // isrc: Some(Isrc::from_str("JPP302400282").unwrap()),
                 party_ipi: ipi,
                 offset: 0,
                 limit: 10,
-                ..WorkSearchParams::default()
+                iswc: None,
+                isrc: None,
             };
             let res = works::search_works(&conn, q, true).await.unwrap();
             dbg!(res);
@@ -148,7 +148,7 @@ pub enum Command {
     },
     WorkSearch {
         #[arg(short, long)]
-        ipi: Option<IpiNameNum>,
+        ipi: IpiNameNum,
         #[arg(short, long)]
         name: Option<String>,
         #[arg(short, long)]

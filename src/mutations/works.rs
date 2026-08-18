@@ -53,13 +53,15 @@ pub struct Release {
     pub release_date: Option<NaiveDate>,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct WorkSearchParams {
     pub iswc: Option<Iswc>,
     pub isrc: Option<Isrc>,
     pub title: Option<String>,
     pub artist: Option<String>,
-    pub party_ipi: Option<IpiNameNum>,
+    // to avoid dynamic sql this is not null
+    // TODO: make this optional and use query builder
+    pub party_ipi: IpiNameNum,
     pub limit: usize,
     pub offset: usize,
 }
@@ -95,14 +97,12 @@ pub async fn search_works(
                     AND rs.isrc = ?4
               )
             )
-            AND (
-              ?5 IS NULL OR EXISTS (
+            AND EXISTS (
                 SELECT 1
                 FROM shares s
                 JOIN parties p ON p.id = s.party_id
                 WHERE s.work_id = wk.id
                   AND p.ipi = ?5
-              )
             )
           LIMIT ?6 OFFSET ?7
         )
@@ -142,7 +142,7 @@ pub async fn search_works(
                 q.title.map(|x| x.to_uppercase()),
                 q.artist.map(|x| x.to_uppercase()),
                 q.isrc.map(|x| x.to_string()),
-                q.party_ipi.map(|x| x.0 as i64),
+                q.party_ipi.0 as i64,
                 q.limit as i64,
                 (q.offset * q.limit) as i64,
             ),
