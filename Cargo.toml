@@ -10,7 +10,7 @@ codegen-units = 1
 
 [package]
 name = "mlc-reader"
-version = "0.1.7"
+version = "0.1.8"
 edition = "2024"
 
 [dependencies]
@@ -28,4 +28,4 @@ musicmeta = { git = "https://github.com/arod1213/musicmeta.git", version = "0.1.
 chrono = { version = "0.4.45", features = ["serde"] }
 strum = "0.28.0"
 env_logger = "0.11.11"
-log = "0.4.33"
+log = "0.4.32"
