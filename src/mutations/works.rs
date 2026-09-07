@@ -310,3 +310,251 @@ pub async fn get_works_parties(
     }
     Ok(v)
 }
+
+pub async fn search_party_works(
+    conn: &Connection,
+    ipi: IpiNameNum,
+    offset: usize,
+    limit: usize,
+    is_deep: bool,
+) -> Result<Vec<WorkInfo>, libsql::Error> {
+    let sql = "
+        WITH matched_works AS (
+          SELECT wk.id
+          FROM parties p
+          JOIN shares s ON s.party_id = p.id
+          JOIN works wk ON wk.id = s.work_id
+          WHERE p.ipi = ?1
+          LIMIT ?2 OFFSET ?3
+        )
+        SELECT
+          wk.id,
+          wk.title,
+          wk.duration_ms,
+          wk.iswc,
+          wk.in_dispute,
+          COALESCE(
+              json_group_array(
+                  CASE
+                      WHEN r.id IS NOT NULL THEN json_object(
+                        'id', r.id,
+                        'title', r.title,
+                        'artist_name', r.artist_name,
+                        'label_name', r.label_name,
+                        'distro_name', r.distro_name,
+                        'isrc', rs.isrc,
+                        'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
+                      )
+                  END
+              ),
+              '[]'
+          ) AS releases
+        FROM matched_works mw
+        JOIN works wk ON wk.id = mw.id
+        LEFT JOIN work_resources wr ON wr.work_id = wk.id
+        LEFT JOIN resources rs ON rs.id = wr.resource_id
+        LEFT JOIN releases r ON r.id = rs.release_id
+        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
+    let mut rows = conn
+        .query(
+            sql,
+            params!(ipi.0 as i64, limit as i64, (offset * limit) as i64,),
+        )
+        .await?;
+    let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
+    while let Some(row) = rows.next().await? {
+        let work_id: String = row.get(0)?;
+        works_by_id.insert(
+            work_id.clone(),
+            WorkInfo {
+                id: work_id,
+                title: row.get(1)?,
+                duration_ms: row.get(2)?,
+                iswc: row
+                    .get::<Option<String>>(3)?
+                    .and_then(|s| Iswc::try_from(s).ok()),
+                in_dispute: row.get(4)?,
+                parties: vec![],
+                releases: row
+                    .get::<String>(5)
+                    .ok()
+                    .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
+                    .unwrap_or_default(),
+            },
+        );
+    }
+    if is_deep {
+        let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        for (id, work) in works_by_id.iter_mut() {
+            work.parties = parties_by_work.remove(id).unwrap_or_default();
+        }
+    }
+    Ok(works_by_id.into_values().collect())
+}
+
+pub async fn search_works_by_isrc(
+    conn: &Connection,
+    isrc: Isrc,
+    offset: usize,
+    limit: usize,
+    is_deep: bool,
+) -> Result<Vec<WorkInfo>, libsql::Error> {
+    let sql = "
+        WITH matched_works AS (
+          SELECT wk.id
+          FROM works wk
+          WHERE EXISTS (
+            SELECT 1
+            FROM work_resources wr
+            JOIN resources rs ON rs.id = wr.resource_id
+            WHERE wr.work_id = wk.id
+                AND rs.isrc = ?1
+          )
+          LIMIT ?2 OFFSET ?3
+        )
+        SELECT
+          wk.id,
+          wk.title,
+          wk.duration_ms,
+          wk.iswc,
+          wk.in_dispute,
+          COALESCE(
+              json_group_array(
+                  CASE
+                      WHEN r.id IS NOT NULL THEN json_object(
+                        'id', r.id,
+                        'title', r.title,
+                        'artist_name', r.artist_name,
+                        'label_name', r.label_name,
+                        'distro_name', r.distro_name,
+                        'isrc', rs.isrc,
+                        'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
+                      )
+                  END
+              ),
+              '[]'
+          ) AS releases
+        FROM matched_works mw
+        JOIN works wk ON wk.id = mw.id
+        LEFT JOIN work_resources wr ON wr.work_id = wk.id
+        LEFT JOIN resources rs ON rs.id = wr.resource_id
+        LEFT JOIN releases r ON r.id = rs.release_id
+        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
+    let mut rows = conn
+        .query(
+            sql,
+            params!(isrc.to_string(), limit as i64, (offset * limit) as i64,),
+        )
+        .await?;
+    let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
+    while let Some(row) = rows.next().await? {
+        let work_id: String = row.get(0)?;
+        works_by_id.insert(
+            work_id.clone(),
+            WorkInfo {
+                id: work_id,
+                title: row.get(1)?,
+                duration_ms: row.get(2)?,
+                iswc: row
+                    .get::<Option<String>>(3)?
+                    .and_then(|s| Iswc::try_from(s).ok()),
+                in_dispute: row.get(4)?,
+                parties: vec![],
+                releases: row
+                    .get::<String>(5)
+                    .ok()
+                    .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
+                    .unwrap_or_default(),
+            },
+        );
+    }
+    if is_deep {
+        let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        for (id, work) in works_by_id.iter_mut() {
+            work.parties = parties_by_work.remove(id).unwrap_or_default();
+        }
+    }
+    Ok(works_by_id.into_values().collect())
+}
+
+pub async fn search_works_by_iswc(
+    conn: &Connection,
+    iswc: Iswc,
+    offset: usize,
+    limit: usize,
+    is_deep: bool,
+) -> Result<Vec<WorkInfo>, libsql::Error> {
+    let sql = "
+        WITH matched_works AS (
+          SELECT wk.id
+          FROM works wk
+          WHERE wk.iswc = ?1
+          LIMIT ?2 OFFSET ?3
+        )
+        SELECT
+          wk.id,
+          wk.title,
+          wk.duration_ms,
+          wk.iswc,
+          wk.in_dispute,
+          COALESCE(
+              json_group_array(
+                  CASE
+                      WHEN r.id IS NOT NULL THEN json_object(
+                        'id', r.id,
+                        'title', r.title,
+                        'artist_name', r.artist_name,
+                        'label_name', r.label_name,
+                        'distro_name', r.distro_name,
+                        'isrc', rs.isrc,
+                        'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
+                      )
+                  END
+              ),
+              '[]'
+          ) AS releases
+        FROM matched_works mw
+        JOIN works wk ON wk.id = mw.id
+        LEFT JOIN work_resources wr ON wr.work_id = wk.id
+        LEFT JOIN resources rs ON rs.id = wr.resource_id
+        LEFT JOIN releases r ON r.id = rs.release_id
+        GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
+    let mut rows = conn
+        .query(
+            sql,
+            params!(iswc.to_string(), limit as i64, (offset * limit) as i64,),
+        )
+        .await?;
+    let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
+    while let Some(row) = rows.next().await? {
+        let work_id: String = row.get(0)?;
+        works_by_id.insert(
+            work_id.clone(),
+            WorkInfo {
+                id: work_id,
+                title: row.get(1)?,
+                duration_ms: row.get(2)?,
+                iswc: row
+                    .get::<Option<String>>(3)?
+                    .and_then(|s| Iswc::try_from(s).ok()),
+                in_dispute: row.get(4)?,
+                parties: vec![],
+                releases: row
+                    .get::<String>(5)
+                    .ok()
+                    .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
+                    .unwrap_or_default(),
+            },
+        );
+    }
+    if is_deep {
+        let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        for (id, work) in works_by_id.iter_mut() {
+            work.parties = parties_by_work.remove(id).unwrap_or_default();
+        }
+    }
+    Ok(works_by_id.into_values().collect())
+}

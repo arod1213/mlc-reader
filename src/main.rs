@@ -9,8 +9,11 @@ use mlc_reader::mutations::works::{self, WorkSearchParams};
 use mlc_reader::types::Role;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use musicmeta::ipi::IpiNameNum;
+use musicmeta::isrc::Isrc;
+use musicmeta::iswc::Iswc;
 use serde::Deserialize;
 use std::path::PathBuf;
+use std::str::FromStr;
 use std::{env, io::BufReader};
 
 async fn open_db(url: &str, is_local: bool) -> Result<libsql::Database, libsql::Error> {
@@ -53,17 +56,23 @@ async fn main() {
             let res = works::get_works(&conn, &[id]).await.unwrap();
             dbg!(res);
         }
-        Command::WorkSearch { artist, name, ipi } => {
-            let q = WorkSearchParams {
-                title: name,
-                artist,
-                party_ipi: ipi,
-                offset: 0,
-                limit: 10,
-                iswc: None,
-                isrc: None,
-            };
-            let res = works::search_works(&conn, q, true).await.unwrap();
+        Command::WorkSearch { mode } => {
+            let offset: usize = 0;
+            let limit: usize = 100;
+            let is_deep = false;
+            let res = match mode {
+                SearchMode::Party { ipi } => {
+                    works::search_party_works(&conn, ipi, offset, limit, is_deep).await
+                }
+                SearchMode::Record { isrc } => {
+                    let isrc = Isrc::from_str(&isrc).expect("invalid isrc");
+                    works::search_works_by_isrc(&conn, isrc, offset, limit, is_deep).await
+                }
+                SearchMode::Work { iswc } => {
+                    works::search_works_by_iswc(&conn, iswc, offset, limit, is_deep).await
+                }
+            }
+            .unwrap();
             dbg!(res);
         }
         // save MLC BWARM TSV files onto disk
@@ -134,6 +143,22 @@ pub struct Args {
 }
 
 #[derive(clap::Subcommand, Debug)]
+pub enum SearchMode {
+    Party {
+        #[arg(short, long)]
+        ipi: IpiNameNum,
+    },
+    Record {
+        #[arg(short, long)]
+        isrc: String,
+    },
+    Work {
+        #[arg(short, long)]
+        iswc: Iswc,
+    },
+}
+
+#[derive(clap::Subcommand, Debug)]
 pub enum Command {
     Talent {},
     Work {
@@ -147,12 +172,8 @@ pub enum Command {
         role: Option<Role>,
     },
     WorkSearch {
-        #[arg(short, long)]
-        ipi: IpiNameNum,
-        #[arg(short, long)]
-        name: String,
-        #[arg(short, long)]
-        artist: Option<String>,
+        #[command(subcommand)]
+        mode: SearchMode,
     },
     Relation {
         #[arg(short, long)]
