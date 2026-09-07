@@ -177,26 +177,13 @@ Notes:
 
 ### Search Works
 
-Search works by title, artist name, and/or party IPI.
+Search works by ISRC, ISWC, or shareholder party IPI.
 
 ```bash
-mlc-reader work-search --name "SONG TITLE"
-mlc-reader work-search --artist "ARTIST NAME"
-mlc-reader work-search --ipi 123456789
-mlc-reader work-search --name "SONG TITLE" --artist "ARTIST NAME" --ipi 123456789
+mlc-reader work-search party --ipi IPI_NUM
+mlc-reader work-search record --isrc 'ISRC'
+mlc-reader work-search work --iswc 'ISWC'
 ```
-
-Options:
-
-- `--name`, `-n`: exact work title filter
-- `--artist`, `-a`: exact release artist filter
-- `--ipi`, `-i`: party IPI name number filter
-
-Notes:
-
-- Title and artist inputs are uppercased before querying.
-- Results include work metadata, matching releases, parties, and shares.
-- The current CLI returns up to 10 works.
 
 ### Get Work By ID
 
