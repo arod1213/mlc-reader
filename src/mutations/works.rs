@@ -402,16 +402,11 @@ pub async fn search_works_by_isrc(
 ) -> Result<Vec<WorkInfo>, libsql::Error> {
     let sql = "
         WITH matched_works AS (
-          SELECT wk.id
-          FROM works wk
-          WHERE EXISTS (
-            SELECT 1
+            SELECT wr.work_id as id
             FROM work_resources wr
             JOIN resources rs ON rs.id = wr.resource_id
-            WHERE wr.work_id = wk.id
-                AND rs.isrc = ?1
-          )
-          LIMIT ?2 OFFSET ?3
+            WHERE rs.isrc = ?1
+            LIMIT ?2 OFFSET ?3
         )
         SELECT
           wk.id,
