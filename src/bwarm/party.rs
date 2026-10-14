@@ -23,6 +23,29 @@ impl BwarmEntry for Party<'_> {
         "parties.tsv".into()
     }
 
+    fn validate_headers(headers: &StringRecord) -> Result<(), String> {
+        let f = |field, header, idx| -> Result<(), String> {
+            let Some(x) = headers.get(idx) else {
+                return Err(format!("could not get column {idx}"));
+            };
+            if x != header {
+                return Err(format!("{field} ({header}) is not at column {idx}"));
+            }
+            Ok(())
+        };
+        f("id", "#PartyRecordId", 0)?;
+        f("isni", "ISNI", 1)?;
+        f("ipi", "IpiNameNumber", 2)?;
+        f("cisac_id", "CisacSocietyId", 3)?;
+        f("dpid", "DPID", 4)?;
+        f("full_name", "FullName", 5)?;
+        f("first_name", "NamesBeforeKeyName", 6)?;
+        f("last_name", "KeyName", 7)?;
+        f("contact_name", "ContactName", 9)?;
+        f("email", "EmailAddress", 10)?;
+        Ok(())
+    }
+
     fn prepare<'c>(
         conn: &'c rusqlite::Connection,
     ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {

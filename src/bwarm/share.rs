@@ -40,6 +40,27 @@ impl BwarmEntry for Share<'_> {
         "musicalworkrightshares.tsv".into()
     }
 
+    fn validate_headers(headers: &StringRecord) -> Result<(), String> {
+        let f = |field, header, idx| -> Result<(), String> {
+            let Some(x) = headers.get(idx) else {
+                return Err(format!("could not get column {idx}"));
+            };
+            if x != header {
+                return Err(format!("{field} ({header}) is not at column {idx}"));
+            }
+            Ok(())
+        };
+        f("id", "#MusicalWorkRightShareRecordId", 0)?;
+        f("work_id", "MusicalWorkRecordId", 1)?;
+        f("party_id", "PartyRecordId", 2)?;
+        f("role", "PartyRole", 3)?;
+        f("share", "RightSharePercentage", 4)?;
+        f("rights_type", "RightsType", 6)?;
+        f("preceding_id", "PrecedingMusicalWorkRightShareRecordId", 9)?;
+        f("territory", "TerritoryCode", 10)?;
+        Ok(())
+    }
+
     fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS shares (

@@ -255,6 +255,28 @@ pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Err
 }
 
 /// save writer -> publisher and publisher -> publisher instances
+pub fn enrich_work_totals(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "ALTER TABLE works ADD COLUMN total_shares REAL NOT NULL DEFAULT 0;",
+        [],
+    )?;
+
+    let sql = "
+        WITH totals AS (
+            SELECT work_id, SUM(share) AS share
+            FROM shares
+            GROUP BY work_id
+        )
+        UPDATE works
+        SET total_shares = totals.share
+        FROM totals
+        WHERE totals.work_id = works.id;
+        ";
+    _ = conn.execute(sql, params!())?;
+    Ok(())
+}
+
+/// save writer -> publisher and publisher -> publisher instances
 pub fn enrich_publisher_relations(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         WITH relations AS (

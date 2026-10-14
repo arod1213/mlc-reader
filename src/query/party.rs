@@ -49,7 +49,14 @@ pub fn search_parties(
             }
             log::info!("searching {name} by name");
             let q = "
-            SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
+            SELECT 
+                p.id, 
+                p.first_name, 
+                p.full_name,
+                p.last_name, 
+                p.ipi, 
+                p.pro, 
+                p.role
             FROM parties p
             JOIN parties_fts ON parties_fts.rowid = p.id
             WHERE parties_fts MATCH ?1 || '*'
@@ -58,11 +65,21 @@ pub fn search_parties(
 
             let mut stmt = db.prepare(q)?;
             stmt.query_map(params![name, limit], |row| {
+                let (first, last) = {
+                    let a: Option<String> = row.get(1)?;
+                    let b: String = row.get(3)?;
+                    if (a.is_none() || a == Some("".into())) && b.is_empty() {
+                        (None, row.get(2)?)
+                    } else {
+                        (a, b)
+                    }
+                };
+
                 Ok(Party {
                     id: row.get::<_, i64>(0)? as u64,
-                    first_name: row.get(1).ok(),
-                    last_name: row.get(2)?,
-                    ipi_name_num: row.get::<_, i64>(3).ok().map(|x| x as u64),
+                    first_name: first,
+                    last_name: last,
+                    ipi_name_num: row.get::<_, i64>(4).ok().map(|x| x as u64),
                     pro: row
                         .get::<_, i64>(5)
                         .ok()
@@ -77,7 +94,14 @@ pub fn search_parties(
         }
         PartyInput::Ipi(ipi) => {
             let q = "
-            SELECT id, first_name, last_name, ipi, pro, role
+            SELECT 
+                id, 
+                first_name, 
+                full_name,
+                last_name, 
+                ipi, 
+                pro, 
+                role
             FROM parties
             WHERE ipi = ?1
             LIMIT ?2";
@@ -85,11 +109,21 @@ pub fn search_parties(
             log::info!("searching {ipi} by IPI");
             let mut stmt = db.prepare(q)?;
             stmt.query_map(params![ipi.0 as i64, limit], |row| {
+                let (first, last) = {
+                    let a: Option<String> = row.get(1)?;
+                    let b: String = row.get(3)?;
+                    if (a.is_none() || a == Some("".into())) && b.is_empty() {
+                        (None, row.get(2)?)
+                    } else {
+                        (a, b)
+                    }
+                };
+
                 Ok(Party {
                     id: row.get::<_, i64>(0)? as u64,
-                    first_name: row.get(1).ok(),
-                    last_name: row.get(2)?,
-                    ipi_name_num: row.get::<_, i64>(3).ok().map(|x| x as u64),
+                    first_name: first,
+                    last_name: last,
+                    ipi_name_num: row.get::<_, i64>(4).ok().map(|x| x as u64),
                     pro: row
                         .get::<_, i64>(5)
                         .ok()
@@ -105,7 +139,7 @@ pub fn search_parties(
     }
 }
 
-pub async fn get_party_collaborators(
+pub fn get_party_collaborators(
     db: &rusqlite::Connection,
     party_id: u64,
     is_publishers: bool,
@@ -141,7 +175,7 @@ pub async fn get_party_collaborators(
           LIMIT ?"
     };
     let mut stmt = db.prepare(q)?;
-    stmt.query_map(params![party_id as i64, limit], |row| {
+    let rows = stmt.query_map(params![party_id as i64, limit], |row| {
         let (first, last) = {
             let a: Option<String> = row.get(1)?;
             let b: String = row.get(3)?;
@@ -166,5 +200,5 @@ pub async fn get_party_collaborators(
                 .and_then(|s| Role::from_str(&s).ok()),
         })
     })?;
-    todo!()
+    rows.collect()
 }

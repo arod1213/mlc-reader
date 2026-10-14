@@ -99,6 +99,7 @@ pub struct WorkInfo {
     pub duration_ms: Option<f64>,
     pub iswc: Option<String>,
     pub in_dispute: bool,
+    pub total_shares: f64,
     pub releases: Vec<Release>,
     pub parties: Vec<PartyInfo>,
 }

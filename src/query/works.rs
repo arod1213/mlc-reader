@@ -42,6 +42,7 @@ pub fn get_works<T: AsRef<str> + ToSql>(
           wk.duration_ms,
           wk.iswc,
           wk.in_dispute,
+          wk.total_shares,
           COALESCE(
               json_group_array(
                   CASE
@@ -72,12 +73,13 @@ pub fn get_works<T: AsRef<str> + ToSql>(
         let w = WorkInfo {
             id: row.get(0)?,
             title: row.get(1)?,
-            duration_ms: row.get(2)?,
+            duration_ms: row.get(2).ok(),
             iswc: row.get::<_, Option<String>>(3)?,
             in_dispute: row.get(4)?,
             parties: vec![],
+            total_shares: row.get(5)?,
             releases: row
-                .get::<_, String>(5)
+                .get::<_, String>(6)
                 .ok()
                 .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                 .unwrap_or_default(),
@@ -187,7 +189,8 @@ pub fn search_works_by_isrcs<T: AsRef<str> + ToSql>(
           wk.title,
           wk.duration_ms,
           wk.iswc,
-          wk.in_dispute
+          wk.in_dispute,
+          wk.total_shares
         FROM matched_resources r
         JOIN work_resources wr ON wr.resource_id = r.id
         JOIN works wk on wk.id = wr.work_id
@@ -203,6 +206,7 @@ pub fn search_works_by_isrcs<T: AsRef<str> + ToSql>(
             duration_ms: row.get(3)?,
             iswc: row.get::<_, Option<String>>(4)?,
             in_dispute: row.get(5)?,
+            total_shares: row.get(6)?,
             parties: vec![],
             releases: vec![],
         };
@@ -229,7 +233,8 @@ pub fn search_works_by_iswcs<T: AsRef<str> + ToSql>(
           wk.title,
           wk.duration_ms,
           wk.iswc,
-          wk.in_dispute
+          wk.in_dispute,
+          wk.total_shares
         FROM matched_resources r
         JOIN work_resources wr ON wr.resource_id = r.id
         FROM works wk
@@ -246,6 +251,7 @@ pub fn search_works_by_iswcs<T: AsRef<str> + ToSql>(
             duration_ms: row.get(2)?,
             iswc: Some(iswc.clone()),
             in_dispute: row.get(4)?,
+            total_shares: row.get(5)?,
             parties: vec![],
             releases: vec![],
         };
@@ -258,4 +264,51 @@ pub fn search_works_by_iswcs<T: AsRef<str> + ToSql>(
         works_by_iswc.entry(iswc).or_default().push(work);
     }
     Ok(works_by_iswc)
+}
+
+pub fn search_works_by_title(
+    db: &rusqlite::Connection,
+    artist: Option<&str>,
+    title: &str,
+) -> Result<Vec<WorkInfo>, rusqlite::Error> {
+    let artist_condition = if artist.is_some() {
+        "
+        JOIN work_resources wr on wr.work_id = wk.id
+        JOIN resources rs on rs.id = wr.resource_id
+        JOIN releases r on r.id = rs.release_id
+        WHERE r.artist_name = ?2
+        "
+    } else {
+        "WHERE ?2 is null"
+    };
+    let q = format!(
+        "
+        SELECT
+          wk.id,
+          wk.title,
+          wk.duration_ms,
+          wk.iswc,
+          wk.in_dispute,
+          wk.total_shares
+        FROM works wk
+        {artist_condition}
+        AND wk.title LIKE ?1
+        "
+    );
+
+    let mut stmt = db.prepare(&q)?;
+    let rows = stmt.query_map(params![title, artist], |row| {
+        Ok(WorkInfo {
+            id: row.get(0)?,
+            title: row.get(1)?,
+            duration_ms: row.get(2)?,
+            iswc: row.get::<_, Option<String>>(3)?,
+            in_dispute: row.get(4)?,
+            total_shares: row.get(5)?,
+            parties: vec![],
+            releases: vec![],
+        })
+    })?;
+
+    rows.collect()
 }

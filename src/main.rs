@@ -2,7 +2,6 @@ use clap::{Parser, ValueEnum};
 use dotenv::dotenv;
 use mlc_reader::migration::trim_db;
 use mlc_reader::migration::utils::disable_fk;
-use mlc_reader::types::Role;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use musicmeta::ipi::IpiNameNum;
 use musicmeta::iswc::Iswc;
@@ -19,44 +18,6 @@ fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Talent {} => {
-            // let res = top_unsigned_writers(&conn).unwrap();
-            // dbg!(res);
-        }
-        Command::Relation { id } => {
-            // let res = relations::get_writer_collaborators(&conn, id, 0)
-            //
-            //     .unwrap();
-            // dbg!(res);
-        }
-        Command::PartySearch { input, role } => {
-            // let res = search_parties(&conn, input.into(), role, 30).unwrap();
-            // dbg!(res);
-        }
-        Command::Work { id } => {
-            // let res = works::get_works(&conn, &[id]).unwrap();
-            // dbg!(res);
-        }
-        Command::WorkSearch { mode } => {
-            // let offset: usize = 0;
-            // let limit: usize = 100;
-            // let is_deep = false;
-            // let res = match mode {
-            //     SearchMode::Party { ipi } => {
-            //         works::search_party_works(&conn, ipi, offset, limit, is_deep)
-            //     }
-            //     SearchMode::Record { isrc } => {
-            //         let isrc = Isrc::from_str(&isrc).expect("invalid isrc");
-            //         works::search_works_by_isrc(&conn, isrc, offset, limit, is_deep)
-            //     }
-            //     SearchMode::Work { iswc } => {
-            //         works::search_works_by_iswc(&conn, iswc, offset, limit, is_deep)
-            //     }
-            // }
-            // .unwrap();
-            // dbg!(res);
-        }
-        // save MLC BWARM TSV files onto disk
         Command::Save { path } => {
             let cred = Credential {
                 host: env::var("MLC_HOST").expect("missing MLC_HOST"),
@@ -90,7 +51,10 @@ fn main() {
                     EnrichMode::Writer => migration::enrich_writer_relations(&tx),
                     EnrichMode::Publisher => migration::enrich_publisher_relations(&tx),
                     EnrichMode::Role => migration::assign_roles(&tx),
-                    EnrichMode::Share => migration::add_party_stats(&tx),
+                    EnrichMode::Share => {
+                        migration::add_party_stats(&tx).unwrap();
+                        migration::enrich_work_totals(&tx)
+                    }
                 }
             };
             match res {
@@ -138,25 +102,6 @@ pub enum SearchMode {
 
 #[derive(clap::Subcommand, Debug)]
 pub enum Command {
-    Talent {},
-    Work {
-        #[arg(short, long)]
-        id: String,
-    },
-    PartySearch {
-        #[arg(short, long)]
-        input: String,
-        #[arg(short, long)]
-        role: Option<Role>,
-    },
-    WorkSearch {
-        #[command(subcommand)]
-        mode: SearchMode,
-    },
-    Relation {
-        #[arg(short, long)]
-        id: i64,
-    },
     Save {
         #[arg(short, long)]
         path: PathBuf,

@@ -40,7 +40,7 @@ pub enum WorkIdentifier {
     Iswc,
 }
 
-pub async fn search_works(
+pub async fn search_works_by_codes(
     State(state): State<state::State>,
     Json(body): Json<SearchWorksBody>,
 ) -> Result<Json<Envelope<HashMap<String, Vec<WorkInfo>>>>, ApiError> {

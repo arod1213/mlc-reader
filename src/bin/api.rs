@@ -2,6 +2,7 @@ use std::env;
 
 use axum::{
     Json, Router,
+    extract::State,
     http::{Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
@@ -10,13 +11,16 @@ use dotenv::dotenv;
 use mlc_reader::api::{
     self,
     party::{get_party, get_party_works, search_parties},
-    work::{get_work, search_works},
+    work::{get_work, search_works_by_codes},
 };
 use tower_http::cors::{Any, CorsLayer};
 
 /// Simple health check to ensure API is live
-async fn health() -> impl IntoResponse {
-    (StatusCode::OK, Json("ok")).into_response()
+async fn health(State(state): State<api::state::State>) -> impl IntoResponse {
+    match rusqlite::Connection::open(state.db_url) {
+        Ok(_) => (StatusCode::OK, Json("ok")).into_response(),
+        Err(e) => (StatusCode::SERVICE_UNAVAILABLE, Json(e.to_string())).into_response(),
+    }
 }
 
 #[tokio::main]
@@ -36,7 +40,7 @@ async fn main() {
 
     let api = Router::new()
         // find works by ISRCs or ISWCs
-        .route("/works", post(search_works))
+        .route("/works", post(search_works_by_codes))
         // get one work (with more info)
         .route("/work/{id}", get(get_work))
         // find parties by Name or IPI

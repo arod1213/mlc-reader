@@ -16,6 +16,22 @@ impl BwarmEntry for WorkResource<'_> {
         "workresourcelinks.tsv".into()
     }
 
+    fn validate_headers(headers: &StringRecord) -> Result<(), String> {
+        let f = |field, header, idx| -> Result<(), String> {
+            let Some(x) = headers.get(idx) else {
+                return Err(format!("could not get column {idx}"));
+            };
+            if x != header {
+                return Err(format!("{field} ({header}) is not at column {idx}"));
+            }
+            Ok(())
+        };
+        f("id", "#LinkRecordId", 0)?;
+        f("work_id", "MusicalWorkRecordId", 1)?;
+        f("resource_id", "ResourceRecordId", 2)?;
+        Ok(())
+    }
+
     fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS work_resources (

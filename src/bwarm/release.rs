@@ -18,6 +18,25 @@ impl<'a> BwarmEntry for Release<'a> {
         "releases.tsv".into()
     }
 
+    fn validate_headers(headers: &StringRecord) -> Result<(), String> {
+        let f = |field, header, idx| -> Result<(), String> {
+            let Some(x) = headers.get(idx) else {
+                return Err(format!("could not get column {idx}"));
+            };
+            if x != header {
+                return Err(format!("{field} ({header}) is not at column {idx}"));
+            }
+            Ok(())
+        };
+        f("id", "#ReleaseRecordId", 0)?;
+        f("title", "ReleaseTitle", 2)?;
+        f("artist_name", "DisplayArtistName", 5)?;
+        f("label_name", "LabelName", 7)?;
+        f("distro_name", "DistributorName", 8)?;
+        f("release_date", "ReleaseDate", 9)?;
+        Ok(())
+    }
+
     fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS releases (

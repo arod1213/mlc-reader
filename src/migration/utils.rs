@@ -38,6 +38,11 @@ where
         .has_headers(true)
         .from_reader(file);
 
+    // assert that the code matches the implementation
+    // TODO: would be nice to find IDXs from the headers and only error if not found
+    let headers = rdr.headers()?;
+    T::validate_headers(headers)?;
+
     let mut tx = conn.transaction()?;
     let mut stmt = T::prepare(&tx)?;
     let mut sum = 0;
