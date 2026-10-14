@@ -92,9 +92,9 @@ impl BwarmEntry for Share<'_> {
             party_id: fields.get(2).ok_or("missing party id")?.parse::<i64>()?,
             role: fields.get(3).ok_or("missing role")?,
             share: fields.get(4).and_then(|x| x.parse::<f64>().ok()),
-            rights_type: fields.get(5),
-            territory: fields.get(7).ok_or("missing territory")?,
-            preceding_id: fields.get(8),
+            rights_type: fields.get(6),
+            territory: fields.get(10).ok_or("missing territory")?,
+            preceding_id: fields.get(9),
         };
         _ = stmt.execute(params!(
             x.id,
