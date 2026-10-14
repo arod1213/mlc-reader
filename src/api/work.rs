@@ -5,7 +5,6 @@ use axum::{
     extract::{Path, State},
 };
 use serde::Deserialize;
-use strum::EnumString;
 
 use crate::{
     api::{
@@ -34,8 +33,8 @@ pub struct SearchWorksBody {
     pub method: WorkIdentifier,
 }
 
-#[derive(Deserialize, EnumString)]
-#[strum(serialize_all = "snake_case")]
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum WorkIdentifier {
     Isrc,
     Iswc,
