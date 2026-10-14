@@ -11,25 +11,28 @@ use crate::{
     server::{self, Credential},
 };
 use rusqlite::{Connection, params};
-use std::path::Path;
+use std::{error::Error, path::Path};
 
 mod pks;
 mod trim;
 pub mod utils;
 
 /// save TSV files from SFTP
-pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) {
+pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let sftp = cred.open().unwrap();
-    let dir = server::latest_dir(&sftp).expect("missing MLC dirs");
+    let Some(dir) = server::latest_dir(&sftp) else {
+        return Err("Missing MLC dirs".into());
+    };
     log::debug!("dir is {:?}", dir);
 
     // TODO: make multithreaded (too slow rn)
-    server::save_doc::<Party>(&sftp, &dir, out_dir).expect("failed to save Parties");
-    server::save_doc::<Work>(&sftp, &dir, out_dir).expect("failed to save Works");
-    server::save_doc::<WorkResource>(&sftp, &dir, out_dir).expect("failed to save WorkResources");
-    server::save_doc::<Share>(&sftp, &dir, out_dir).expect("failed to save Shares");
-    server::save_doc::<Release>(&sftp, &dir, out_dir).expect("failed to save Releases");
-    server::save_doc::<Resource>(&sftp, &dir, out_dir).expect("failed to save Resources");
+    server::save_doc::<Party>(&sftp, &dir, out_dir)?;
+    server::save_doc::<Work>(&sftp, &dir, out_dir)?;
+    server::save_doc::<WorkResource>(&sftp, &dir, out_dir)?;
+    server::save_doc::<Share>(&sftp, &dir, out_dir)?;
+    server::save_doc::<Release>(&sftp, &dir, out_dir)?;
+    server::save_doc::<Resource>(&sftp, &dir, out_dir)?;
+    Ok(())
 }
 
 pub fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), rusqlite::Error> {
@@ -74,18 +77,22 @@ pub fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), rusqlite::Error> {
 }
 
 /// migrate DB and save TSV files into db
-pub fn migrate_from_bwarm_dump(conn: &mut Connection, bwarm_dir: &Path) {
-    migrate_schema(conn).expect("failed to migrate");
+pub fn migrate_from_bwarm_dump(
+    conn: &mut Connection,
+    bwarm_dir: &Path,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    migrate_schema(conn)?;
 
-    setup_bulk_write_mode(conn).expect("failed to setup WAL");
-    disable_fk(conn).expect("failed to disable FKs");
+    setup_bulk_write_mode(conn)?;
+    disable_fk(conn)?;
 
-    save_object::<Release>(conn, bwarm_dir).unwrap();
-    save_object::<Resource>(conn, bwarm_dir).unwrap();
-    save_object::<Party>(conn, bwarm_dir).unwrap();
-    save_object::<Work>(conn, bwarm_dir).unwrap();
-    save_object::<WorkResource>(conn, bwarm_dir).unwrap();
-    save_object::<Share>(conn, bwarm_dir).unwrap();
+    save_object::<Release>(conn, bwarm_dir)?;
+    save_object::<Resource>(conn, bwarm_dir)?;
+    save_object::<Party>(conn, bwarm_dir)?;
+    save_object::<Work>(conn, bwarm_dir)?;
+    save_object::<WorkResource>(conn, bwarm_dir)?;
+    save_object::<Share>(conn, bwarm_dir)?;
+    Ok(())
 }
 
 /// add new tables and indexes

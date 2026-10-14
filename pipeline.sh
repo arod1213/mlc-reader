@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-export SQLITE_TMPDIR="./sqlite-tmp"
-export TMPDIR=$SQLITE_TMPDIR
-export RUST_LOG=debug
-
-mkdir -p $SQLITE_TMPDIR
-chmod 700 $SQLITE_TMPDIR
-
 #TSV_STORAGE_PATH="./mlc-sample"
 #TSV_STORAGE_PATH="./Sample Data"
 TSV_STORAGE_PATH="./mlc-bwarm"
@@ -15,12 +8,11 @@ TSV_STORAGE_PATH="./mlc-bwarm"
 cargo build --release
 BIN="./target/release/mlc-reader"
 
-$BIN save -p "$TSV_STORAGE_PATH"
-$BIN migrate -p "$TSV_STORAGE_PATH"
-$BIN trim # --vacuum
-$BIN index-search
-$BIN enrich -m writer
-$BIN enrich -m publisher
-$BIN enrich -m role
-$BIN enrich -m share
-$BIN update -p './updates.txt'
+export SQLITE_TMPDIR="$PWD/sqlite-tmp"
+export TMPDIR=$SQLITE_TMPDIR
+export RUST_LOG=debug
+
+mkdir -p "$SQLITE_TMPDIR"
+chmod 700 "$SQLITE_TMPDIR"
+
+$BIN nightjob

@@ -19,7 +19,10 @@ pub struct Update {
 }
 
 /// requires JSONL input of type struct Update{}
-pub fn update_pro_affiliations<R: BufRead>(r: &mut R, conn: &mut Connection) {
+pub fn update_pro_affiliations<R: BufRead>(
+    r: &mut R,
+    conn: &mut Connection,
+) -> Result<(), rusqlite::Error> {
     for line in r.lines() {
         let Ok(line) = line else {
             continue;
@@ -27,6 +30,7 @@ pub fn update_pro_affiliations<R: BufRead>(r: &mut R, conn: &mut Connection) {
         let Ok(update) = serde_json::from_str::<Update>(&line) else {
             continue;
         };
-        mutations::society::update_publisher_writers(conn, update.id, update.pro).unwrap();
+        mutations::society::update_publisher_writers(conn, update.id, update.pro)?;
     }
+    Ok(())
 }
