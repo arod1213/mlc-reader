@@ -1,5 +1,5 @@
 use csv::StringRecord;
-use libsql::params;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use strum::{Display, EnumString};
 
@@ -40,7 +40,7 @@ impl BwarmEntry for Share<'_> {
         "musicalworkrightshares.tsv".into()
     }
 
-    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS shares (
            id TEXT NOT NULL,
@@ -52,11 +52,13 @@ impl BwarmEntry for Share<'_> {
            territory TEXT NOT NULL,
            preceding_id TEXT
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 
-    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
+    fn prepare<'c>(
+        conn: &'c rusqlite::Connection,
+    ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {
         let sql = "
         INSERT INTO shares (
            id,
@@ -77,12 +79,12 @@ impl BwarmEntry for Share<'_> {
            ?7,
            ?8
         )";
-        conn.prepare(sql).await
+        conn.prepare(sql)
     }
 
-    async fn insert_from_csv(
+    fn insert_from_csv(
         fields: &StringRecord,
-        stmt: &mut libsql::Statement,
+        stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Share {
             id: fields.get(0).ok_or("missing id")?,
@@ -94,18 +96,16 @@ impl BwarmEntry for Share<'_> {
             territory: fields.get(7).ok_or("missing territory")?,
             preceding_id: fields.get(8),
         };
-        _ = stmt
-            .execute(params!(
-                x.id,
-                x.work_id,
-                x.party_id,
-                x.role,
-                x.rights_type,
-                x.share.unwrap_or_default(),
-                x.territory,
-                x.preceding_id,
-            ))
-            .await?;
+        _ = stmt.execute(params!(
+            x.id,
+            x.work_id,
+            x.party_id,
+            x.role,
+            x.rights_type,
+            x.share.unwrap_or_default(),
+            x.territory,
+            x.preceding_id,
+        ))?;
         Ok(())
     }
 }

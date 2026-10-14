@@ -1,6 +1,6 @@
 use crate::bwarm::interface::BwarmEntry;
 use csv::StringRecord;
-use libsql::params;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ impl BwarmEntry for Work<'_> {
         "musicalworks.tsv".into()
     }
 
-    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS works (
            id TEXT NOT NULL,
@@ -33,11 +33,13 @@ impl BwarmEntry for Work<'_> {
            is_arrangement INTEGER NOT NULL,
            territory TEXT
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 
-    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
+    fn prepare<'c>(
+        conn: &'c rusqlite::Connection,
+    ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {
         let sql = "
         INSERT INTO works (
            id,
@@ -58,12 +60,12 @@ impl BwarmEntry for Work<'_> {
            ?7,
            ?8
         )";
-        conn.prepare(sql).await
+        conn.prepare(sql)
     }
 
-    async fn insert_from_csv(
+    fn insert_from_csv(
         fields: &StringRecord,
-        stmt: &mut libsql::Statement,
+        stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Work {
             id: fields.get(0).ok_or("missing id")?,
@@ -75,18 +77,16 @@ impl BwarmEntry for Work<'_> {
             is_arrangement: fields.get(9).map(|x| x == "TRUE").unwrap_or_default(),
             territory: fields.get(8),
         };
-        _ = stmt
-            .execute(params!(
-                x.id,
-                x.title,
-                x.duration_ms,
-                x.iswc,
-                (x.in_dispute as i64),
-                x.alt_id,
-                (x.is_arrangement as i64),
-                x.territory,
-            ))
-            .await?;
+        _ = stmt.execute(params!(
+            x.id,
+            x.title,
+            x.duration_ms,
+            x.iswc,
+            (x.in_dispute as i64),
+            x.alt_id,
+            (x.is_arrangement as i64),
+            x.territory,
+        ))?;
         Ok(())
     }
 }

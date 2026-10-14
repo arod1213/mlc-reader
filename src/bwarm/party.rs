@@ -1,5 +1,5 @@
 use csv::StringRecord;
-use libsql::params;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::bwarm::interface::BwarmEntry;
@@ -23,7 +23,9 @@ impl BwarmEntry for Party<'_> {
         "parties.tsv".into()
     }
 
-    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
+    fn prepare<'c>(
+        conn: &'c rusqlite::Connection,
+    ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {
         let sql = "
         INSERT INTO parties (
            id,
@@ -49,12 +51,12 @@ impl BwarmEntry for Party<'_> {
            ?10
         )
         ";
-        conn.prepare(sql).await
+        conn.prepare(sql)
     }
 
-    async fn insert_from_csv(
+    fn insert_from_csv(
         fields: &StringRecord,
-        stmt: &mut libsql::Statement,
+        stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Party {
             id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
@@ -68,24 +70,22 @@ impl BwarmEntry for Party<'_> {
             last_name: fields.get(7),
             first_name: fields.get(6),
         };
-        _ = stmt
-            .execute(params!(
-                x.id,
-                x.email,
-                x.isni,
-                x.cisac_id,
-                x.dpid,
-                x.ipi,
-                x.contact_name,
-                x.full_name,
-                x.first_name,
-                x.last_name,
-            ))
-            .await?;
+        _ = stmt.execute(params!(
+            x.id,
+            x.email,
+            x.isni,
+            x.cisac_id,
+            x.dpid,
+            x.ipi,
+            x.contact_name,
+            x.full_name,
+            x.first_name,
+            x.last_name,
+        ))?;
         Ok(())
     }
 
-    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS parties (
            id INTEGER NOT NULL,
@@ -101,7 +101,7 @@ impl BwarmEntry for Party<'_> {
            first_name TEXT,
            last_name TEXT
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 }

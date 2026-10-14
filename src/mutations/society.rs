@@ -1,14 +1,14 @@
-use libsql::{Connection, Error, Transaction, params};
 use musicmeta::tis::society::TisSocietyCode;
+use rusqlite::{Connection, Error, Transaction, params};
 
 /// set PRO for publisher and all associated writers
-pub async fn update_publisher_writers(
-    conn: &Connection,
+pub fn update_publisher_writers(
+    conn: &mut Connection,
     id: i64,
     pro_code: TisSocietyCode,
 ) -> Result<(), Error> {
-    let tx = conn.transaction().await.unwrap();
-    let is_err = match update_publisher_writers_inner(&tx, id, pro_code).await {
+    let tx = conn.transaction().unwrap();
+    let is_err = match update_publisher_writers_inner(&tx, id, pro_code) {
         Ok(_) => false,
         Err(e) => {
             log::error!("{:?}", e);
@@ -16,31 +16,31 @@ pub async fn update_publisher_writers(
         }
     };
     match is_err {
-        true => tx.rollback().await,
-        false => tx.commit().await,
+        true => tx.rollback(),
+        false => tx.commit(),
     }
 }
 
-async fn update_publisher_writers_inner(
+fn update_publisher_writers_inner(
     conn: &Transaction,
     id: i64,
     pro_code: TisSocietyCode,
-) -> Result<(), libsql::Error> {
-    update_writers(conn, id, &pro_code).await?;
+) -> Result<(), rusqlite::Error> {
+    update_writers(conn, id, &pro_code)?;
 
     let sql = "
         UPDATE parties SET pro = ?
         WHERE id = ?";
-    let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![pro_code as i64, id]).await?;
+    let mut stmt = conn.prepare(sql)?;
+    stmt.execute(params![pro_code as i64, id])?;
     Ok(())
 }
 
-async fn update_writers(
+fn update_writers(
     conn: &Connection,
     id: i64,
     pro_code: &TisSocietyCode,
-) -> Result<(), libsql::Error> {
+) -> Result<(), rusqlite::Error> {
     let sql = "
         UPDATE parties SET pro = ?
         WHERE id IN (
@@ -48,8 +48,7 @@ async fn update_writers(
             FROM publisher_relations
             WHERE parent_id = ?
         )";
-    let stmt = conn.prepare(sql).await?;
-    stmt.execute(params![(*pro_code).clone() as i64, id])
-        .await?;
+    let mut stmt = conn.prepare(sql)?;
+    stmt.execute(params![(*pro_code).clone() as i64, id])?;
     Ok(())
 }

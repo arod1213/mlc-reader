@@ -1,27 +1,28 @@
 use std::{fs::File, path::Path};
 
-use libsql::{Connection, params};
+use rusqlite::{Connection, params};
 
 use crate::bwarm::{
     interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
     work_resource::WorkResource, works::Work,
 };
-pub async fn disable_fk(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn.execute("PRAGMA foreign_keys = OFF", params!()).await?;
+
+pub fn disable_fk(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute("PRAGMA foreign_keys = OFF", params!())?;
     Ok(())
 }
 
-pub async fn setup_write_mode(conn: &Connection) -> Result<(), libsql::Error> {
-    let mut rows = conn.query("PRAGMA journal_mode = WAL", params!()).await?;
-    while rows.next().await?.is_some() {}
+pub fn setup_write_mode(conn: &Connection) -> Result<(), rusqlite::Error> {
+    let mut stmt = conn.prepare("PRAGMA journal_mode = WAL")?;
+    let mut rows = stmt.query([])?;
+    while rows.next()?.is_some() {}
 
-    conn.execute("PRAGMA synchronous = NORMAL", params!())
-        .await?;
+    conn.execute("PRAGMA synchronous = NORMAL", params!())?;
     Ok(())
 }
 
-pub async fn save_object<'r, T>(
-    conn: &Connection,
+pub fn save_object<'r, T>(
+    conn: &mut Connection,
     bwarm_dir: &Path,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>
 where
@@ -37,45 +38,44 @@ where
         .has_headers(true)
         .from_reader(file);
 
-    let mut tx = conn.transaction().await?;
-    let mut stmt = T::prepare(&tx).await?;
+    let mut tx = conn.transaction()?;
+    let mut stmt = T::prepare(&tx)?;
     let mut sum = 0;
 
     let batch_size = 1_000_000;
     for entry in rdr.records() {
         let entry = entry?;
-        match T::insert_from_csv(&entry, &mut stmt).await {
+        match T::insert_from_csv(&entry, &mut stmt) {
             Ok(_) => {
                 sum += 1;
                 if sum % batch_size == 0 {
                     drop(stmt);
-                    tx.commit().await?;
+                    tx.commit()?;
                     log::debug!("@ {}", sum);
 
-                    tx = conn.transaction().await?;
-                    stmt = T::prepare(&tx).await?;
+                    tx = conn.transaction()?;
+                    stmt = T::prepare(&tx)?;
                 }
             }
             Err(e) => {
                 log::error!("failed to save: {e}");
             }
         };
-        stmt.reset();
     }
 
     drop(stmt);
-    tx.commit().await?;
+    tx.commit()?;
     log::info!("inserted {sum}");
     Ok(())
 }
 
-pub async fn migrate_schema(conn: &Connection) -> Result<(), libsql::Error> {
-    Release::migrate(conn).await?;
-    Resource::migrate(conn).await?;
-    Party::migrate(conn).await?;
-    Work::migrate(conn).await?;
-    WorkResource::migrate(conn).await?;
-    Share::migrate(conn).await?;
+pub fn migrate_schema(conn: &Connection) -> Result<(), rusqlite::Error> {
+    Release::migrate(conn)?;
+    Resource::migrate(conn)?;
+    Party::migrate(conn)?;
+    Work::migrate(conn)?;
+    WorkResource::migrate(conn)?;
+    Share::migrate(conn)?;
     // conn.execute("CREATE INDEX idx_party ON parties(id)")
     Ok(())
 }

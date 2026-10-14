@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use chrono::NaiveDate;
-use libsql::{Connection, params};
 use musicmeta::{ipi::IpiNameNum, isrc::Isrc, iswc::Iswc, tis::society::TisSocietyCode};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 pub enum WorkSearch {
@@ -68,11 +68,11 @@ pub struct WorkSearchParams {
     pub offset: usize,
 }
 
-pub async fn search_works(
+pub fn search_works(
     conn: &Connection,
     q: WorkSearchParams,
     is_deep: bool,
-) -> Result<Vec<WorkInfo>, libsql::Error> {
+) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let sql = "
         WITH matched_works AS (
           SELECT wk.id
@@ -132,22 +132,18 @@ pub async fn search_works(
         LEFT JOIN resources rs ON rs.id = wr.resource_id
         LEFT JOIN releases r ON r.id = rs.release_id
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
-    let mut rows = conn
-        .query(
-            sql,
-            params!(
-                q.iswc.map(|x| x.to_string()),
-                q.title.to_uppercase(),
-                q.artist.map(|x| x.to_uppercase()),
-                q.isrc.map(|x| x.to_string()),
-                q.party_ipi.0 as i64,
-                q.limit as i64,
-                (q.offset * q.limit) as i64,
-            ),
-        )
-        .await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(
+        q.iswc.map(|x| x.to_string()),
+        q.title.to_uppercase(),
+        q.artist.map(|x| x.to_uppercase()),
+        q.isrc.map(|x| x.to_string()),
+        q.party_ipi.0 as i64,
+        q.limit as i64,
+        (q.offset * q.limit) as i64,
+    ))?;
     let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         works_by_id.insert(
             work_id.clone(),
@@ -156,12 +152,12 @@ pub async fn search_works(
                 title: row.get(1)?,
                 duration_ms: row.get(2)?,
                 iswc: row
-                    .get::<Option<String>>(3)?
+                    .get::<_, Option<String>>(3)?
                     .and_then(|s| Iswc::try_from(s).ok()),
                 in_dispute: row.get(4)?,
                 parties: vec![],
                 releases: row
-                    .get::<String>(5)
+                    .get::<_, String>(5)
                     .ok()
                     .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                     .unwrap_or_default(),
@@ -170,7 +166,7 @@ pub async fn search_works(
     }
     if is_deep {
         let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
-        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice())?;
         for (id, work) in works_by_id.iter_mut() {
             work.parties = parties_by_work.remove(id).unwrap_or_default();
         }
@@ -178,12 +174,12 @@ pub async fn search_works(
     Ok(works_by_id.into_values().collect())
 }
 
-pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo>, libsql::Error> {
-    if ids.is_empty() {
+pub fn get_works(conn: &Connection, work_ids: &[String]) -> Result<Vec<WorkInfo>, rusqlite::Error> {
+    if work_ids.is_empty() {
         return Ok(vec![]);
     }
 
-    let ids_json = serde_json::json!(ids).to_string();
+    let ids_json = serde_json::json!(work_ids).to_string();
     let sql = "
         SELECT 
             wk.id, 
@@ -214,12 +210,13 @@ pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo
         WHERE wk.id IN (SELECT value FROM json_each(?1))
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
         LIMIT 15;";
-    let mut rows = conn.query(sql, params!(ids_json)).await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(ids_json))?;
 
-    let mut parties_by_work = get_works_parties(conn, ids).await?;
+    let mut parties_by_work = get_works_parties(conn, work_ids)?;
 
     let mut v = vec![];
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         let parties = parties_by_work.remove(&work_id).unwrap_or_default();
 
@@ -228,12 +225,12 @@ pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo
             title: row.get(1)?,
             duration_ms: row.get(2)?,
             iswc: row
-                .get::<Option<String>>(3)?
+                .get::<_, Option<String>>(3)?
                 .and_then(|s| Iswc::try_from(s).ok()),
             in_dispute: row.get(4)?,
             parties,
             releases: row
-                .get::<String>(5)
+                .get::<_, String>(5)
                 .ok()
                 .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                 .unwrap_or_default(),
@@ -243,15 +240,15 @@ pub async fn get_works(conn: &Connection, ids: &[String]) -> Result<Vec<WorkInfo
     Ok(v)
 }
 
-pub async fn get_works_parties(
+pub fn get_works_parties(
     conn: &Connection,
-    ids: &[String],
-) -> Result<HashMap<String, Vec<PartyInfo>>, libsql::Error> {
-    if ids.is_empty() {
+    work_ids: &[String],
+) -> Result<HashMap<String, Vec<PartyInfo>>, rusqlite::Error> {
+    if work_ids.is_empty() {
         return Ok(HashMap::new());
     }
 
-    let ids_json = serde_json::json!(ids).to_string();
+    let ids_json = serde_json::json!(work_ids).to_string();
     let sql = "
         SELECT 
             s.work_id as work_id, 
@@ -279,24 +276,25 @@ pub async fn get_works_parties(
         WHERE s.work_id IN (SELECT value FROM json_each(?1))
         GROUP BY s.work_id, p.id, p.full_name, p.ipi, p.pro";
 
-    let mut rows = conn.query(sql, params!(ids_json)).await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(ids_json))?;
 
     let mut v: HashMap<String, Vec<PartyInfo>> = HashMap::new();
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         let p = PartyInfo {
-            id: row.get::<i64>(1)? as u64,
+            id: row.get::<_, i64>(1)? as u64,
             full_name: row.get(2)?,
             ipi: row
-                .get::<i64>(3)
+                .get::<_, i64>(3)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
             pro: row
-                .get::<i32>(4)
+                .get::<_, i32>(4)
                 .ok()
                 .and_then(|x| TisSocietyCode::try_from(x as u16).ok()),
             shares: row
-                .get::<String>(5)
+                .get::<_, String>(5)
                 .ok()
                 .and_then(|s| serde_json::from_str::<Vec<Share>>(&s).ok())
                 .unwrap_or_default(),
@@ -311,13 +309,13 @@ pub async fn get_works_parties(
     Ok(v)
 }
 
-pub async fn search_party_works(
+pub fn search_party_works(
     conn: &Connection,
     ipi: IpiNameNum,
     offset: usize,
     limit: usize,
     is_deep: bool,
-) -> Result<Vec<WorkInfo>, libsql::Error> {
+) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let sql = "
         WITH matched_works AS (
           SELECT wk.id
@@ -355,14 +353,11 @@ pub async fn search_party_works(
         LEFT JOIN resources rs ON rs.id = wr.resource_id
         LEFT JOIN releases r ON r.id = rs.release_id
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
-    let mut rows = conn
-        .query(
-            sql,
-            params!(ipi.0 as i64, limit as i64, (offset * limit) as i64,),
-        )
-        .await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(ipi.0 as i64, limit as i64, (offset * limit) as i64,))?;
+
     let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         works_by_id.insert(
             work_id.clone(),
@@ -371,12 +366,12 @@ pub async fn search_party_works(
                 title: row.get(1)?,
                 duration_ms: row.get(2)?,
                 iswc: row
-                    .get::<Option<String>>(3)?
+                    .get::<_, Option<String>>(3)?
                     .and_then(|s| Iswc::try_from(s).ok()),
                 in_dispute: row.get(4)?,
                 parties: vec![],
                 releases: row
-                    .get::<String>(5)
+                    .get::<_, String>(5)
                     .ok()
                     .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                     .unwrap_or_default(),
@@ -385,7 +380,7 @@ pub async fn search_party_works(
     }
     if is_deep {
         let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
-        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice())?;
         for (id, work) in works_by_id.iter_mut() {
             work.parties = parties_by_work.remove(id).unwrap_or_default();
         }
@@ -393,13 +388,13 @@ pub async fn search_party_works(
     Ok(works_by_id.into_values().collect())
 }
 
-pub async fn search_works_by_isrc(
+pub fn search_works_by_isrc(
     conn: &Connection,
     isrc: Isrc,
     offset: usize,
     limit: usize,
     is_deep: bool,
-) -> Result<Vec<WorkInfo>, libsql::Error> {
+) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let sql = "
         WITH matched_works AS (
             SELECT wr.work_id as id
@@ -436,14 +431,15 @@ pub async fn search_works_by_isrc(
         LEFT JOIN resources rs ON rs.id = wr.resource_id
         LEFT JOIN releases r ON r.id = rs.release_id
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
-    let mut rows = conn
-        .query(
-            sql,
-            params!(isrc.to_string(), limit as i64, (offset * limit) as i64,),
-        )
-        .await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(
+        isrc.to_string(),
+        limit as i64,
+        (offset * limit) as i64,
+    ))?;
+
     let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         works_by_id.insert(
             work_id.clone(),
@@ -452,12 +448,12 @@ pub async fn search_works_by_isrc(
                 title: row.get(1)?,
                 duration_ms: row.get(2)?,
                 iswc: row
-                    .get::<Option<String>>(3)?
+                    .get::<_, Option<String>>(3)?
                     .and_then(|s| Iswc::try_from(s).ok()),
                 in_dispute: row.get(4)?,
                 parties: vec![],
                 releases: row
-                    .get::<String>(5)
+                    .get::<_, String>(5)
                     .ok()
                     .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                     .unwrap_or_default(),
@@ -466,7 +462,7 @@ pub async fn search_works_by_isrc(
     }
     if is_deep {
         let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
-        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice())?;
         for (id, work) in works_by_id.iter_mut() {
             work.parties = parties_by_work.remove(id).unwrap_or_default();
         }
@@ -474,13 +470,13 @@ pub async fn search_works_by_isrc(
     Ok(works_by_id.into_values().collect())
 }
 
-pub async fn search_works_by_iswc(
+pub fn search_works_by_iswc(
     conn: &Connection,
     iswc: Iswc,
     offset: usize,
     limit: usize,
     is_deep: bool,
-) -> Result<Vec<WorkInfo>, libsql::Error> {
+) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let sql = "
         WITH matched_works AS (
           SELECT wk.id
@@ -516,14 +512,15 @@ pub async fn search_works_by_iswc(
         LEFT JOIN resources rs ON rs.id = wr.resource_id
         LEFT JOIN releases r ON r.id = rs.release_id
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute;";
-    let mut rows = conn
-        .query(
-            sql,
-            params!(iswc.to_string(), limit as i64, (offset * limit) as i64,),
-        )
-        .await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(
+        iswc.to_string(),
+        limit as i64,
+        (offset * limit) as i64,
+    ))?;
+
     let mut works_by_id: HashMap<String, WorkInfo> = HashMap::new();
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let work_id: String = row.get(0)?;
         works_by_id.insert(
             work_id.clone(),
@@ -532,12 +529,12 @@ pub async fn search_works_by_iswc(
                 title: row.get(1)?,
                 duration_ms: row.get(2)?,
                 iswc: row
-                    .get::<Option<String>>(3)?
+                    .get::<_, Option<String>>(3)?
                     .and_then(|s| Iswc::try_from(s).ok()),
                 in_dispute: row.get(4)?,
                 parties: vec![],
                 releases: row
-                    .get::<String>(5)
+                    .get::<_, String>(5)
                     .ok()
                     .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                     .unwrap_or_default(),
@@ -546,7 +543,7 @@ pub async fn search_works_by_iswc(
     }
     if is_deep {
         let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
-        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice()).await?;
+        let mut parties_by_work = get_works_parties(conn, work_ids.as_slice())?;
         for (id, work) in works_by_id.iter_mut() {
             work.parties = parties_by_work.remove(id).unwrap_or_default();
         }

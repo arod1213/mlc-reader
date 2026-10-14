@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
 use crate::types::{Party, Role};
-use libsql::{Connection, params};
 use musicmeta::{ipi::IpiNameNum, tis::society::TisSocietyCode};
+use rusqlite::{Connection, params};
 
 pub enum RelatedPartyInput {
     Id(String),
@@ -22,10 +22,11 @@ impl From<String> for RelatedPartyInput {
 }
 
 /// fetches parties that the ID has as a preceeding share ID
-pub async fn get_party_publishers(
+pub fn get_party_publishers(
     conn: &Connection,
     key: RelatedPartyInput,
-) -> Result<Vec<Party>, libsql::Error> {
+) -> Result<Vec<Party>, rusqlite::Error> {
+    let mut stmt: rusqlite::Statement<'_>;
     let mut rows = match key {
         RelatedPartyInput::Id(id) => {
             let sql = "
@@ -42,7 +43,8 @@ pub async fn get_party_publishers(
                   WHERE w.parent_id = ?
                   ORDER BY w.occurrences DESC
                   LIMIT 10";
-            conn.query(sql, params![id]).await?
+            stmt = conn.prepare(sql)?;
+            stmt.query(params![id])?
         }
         RelatedPartyInput::Ipi(ipi_name_num) => {
             let sql = "
@@ -60,11 +62,12 @@ pub async fn get_party_publishers(
                   WHERE pw.ipi = ?
                   ORDER BY w.occurrences DESC
                   LIMIT 10";
-            conn.query(sql, params![ipi_name_num.0 as i64]).await?
+            stmt = conn.prepare(sql)?;
+            stmt.query(params![ipi_name_num.0 as i64])?
         }
     };
     let mut v = vec![];
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let (first, last) = {
             let a: Option<String> = row.get(1)?;
             let b: String = row.get(3)?;
@@ -75,21 +78,21 @@ pub async fn get_party_publishers(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0)?,
+            id: row.get::<_, i64>(0)? as u64,
             first_name: first,
             last_name: last,
             ipi_name_num: row
-                .get::<i64>(4)
+                .get::<_, i64>(4)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
             pro: row
-                .get::<i64>(5)
+                .get::<_, i64>(5)
                 .ok()
                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
             role: row
-                .get::<String>(6)
-                .and_then(|s| Role::from_str(&s).map_err(|_| libsql::Error::NullValue))
-                .ok(),
+                .get::<_, String>(6)
+                .ok()
+                .and_then(|s| Role::from_str(&s).ok()),
         };
         v.push(w);
     }
@@ -97,10 +100,11 @@ pub async fn get_party_publishers(
 }
 
 /// fetches parties that the ID represents as preceeding share ID
-pub async fn get_party_writers(
+pub fn get_party_writers(
     conn: &Connection,
     key: RelatedPartyInput,
-) -> Result<Vec<Party>, libsql::Error> {
+) -> Result<Vec<Party>, rusqlite::Error> {
+    let mut stmt: rusqlite::Statement<'_>;
     let mut rows = match key {
         RelatedPartyInput::Id(id) => {
             let sql = "
@@ -118,7 +122,8 @@ pub async fn get_party_writers(
                   ORDER BY w.occurrences DESC
                   LIMIT 10";
 
-            conn.query(sql, params![id]).await?
+            stmt = conn.prepare(sql)?;
+            stmt.query(params![id])?
         }
         RelatedPartyInput::Ipi(ipi_name_num) => {
             let sql = "
@@ -137,11 +142,12 @@ pub async fn get_party_writers(
                   ORDER BY w.occurrences DESC
                   LIMIT 10";
 
-            conn.query(sql, params![ipi_name_num.0 as i64]).await?
+            stmt = conn.prepare(sql)?;
+            stmt.query(params![ipi_name_num.0 as i64])?
         }
     };
     let mut v = vec![];
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let (first, last) = {
             let a: Option<String> = row.get(1)?;
             let b: String = row.get(3)?;
@@ -152,21 +158,21 @@ pub async fn get_party_writers(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0)?,
+            id: row.get::<_, i64>(0)? as u64,
             first_name: first,
             last_name: last,
             ipi_name_num: row
-                .get::<i64>(4)
+                .get::<_, i64>(4)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
             pro: row
-                .get::<u64>(5)
+                .get::<_, i64>(5)
                 .ok()
                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
             role: row
-                .get::<String>(6)
-                .and_then(|s| Role::from_str(&s).map_err(|_| libsql::Error::NullValue))
-                .ok(),
+                .get::<_, String>(6)
+                .ok()
+                .and_then(|s| Role::from_str(&s).ok()),
         };
         v.push(w);
     }
@@ -174,11 +180,11 @@ pub async fn get_party_writers(
 }
 
 /// fetches top writing partners for a given writer
-pub async fn get_writer_collaborators(
+pub fn get_writer_collaborators(
     conn: &Connection,
     party_id: i64,
     offset: usize,
-) -> Result<Vec<Party>, libsql::Error> {
+) -> Result<Vec<Party>, rusqlite::Error> {
     let sql = "
           SELECT
             p.id,
@@ -207,10 +213,11 @@ pub async fn get_writer_collaborators(
           LIMIT 15 OFFSET $2;
         ";
 
-    let mut rows = conn.query(sql, params!(party_id, offset as i64)).await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(party_id, offset as i64))?;
 
     let mut v = vec![];
-    while let Some(row) = rows.next().await? {
+    while let Some(row) = rows.next()? {
         let (first, last) = {
             let full: String = row.get(2)?;
             let first: Option<String> = row.get(1)?;
@@ -227,21 +234,21 @@ pub async fn get_writer_collaborators(
             }
         };
         let w = Party {
-            id: row.get::<u64>(0)?,
+            id: row.get::<_, i64>(0)? as u64,
             first_name: first,
             last_name: last,
             ipi_name_num: row
-                .get::<i64>(4)
+                .get::<_, i64>(4)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
             pro: row
-                .get::<u64>(5)
+                .get::<_, i64>(5)
                 .ok()
                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
             role: row
-                .get::<String>(6)
-                .and_then(|s| Role::from_str(&s).map_err(|_| libsql::Error::NullValue))
-                .ok(),
+                .get::<_, String>(6)
+                .ok()
+                .and_then(|s| Role::from_str(&s).ok()),
         };
         v.push(w);
     }

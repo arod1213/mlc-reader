@@ -7,8 +7,8 @@
 use std::str::FromStr;
 
 use crate::types::{Party, Role};
-use libsql::{Connection, params};
 use musicmeta::{ipi::IpiNameNum, tis::society::TisSocietyCode};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -31,104 +31,101 @@ impl From<String> for PartyInput {
     }
 }
 
-/// searches writers / publishers by name or ipi
-/// skips writers missing IPI
-pub async fn search_parties(
-    conn: &Connection,
-    param: PartyInput,
-    role: Option<Role>,
-    limit: usize,
-) -> Result<Vec<Party>, libsql::Error> {
-    let mut rows = match param {
-        PartyInput::Name(name) => {
-            if name.is_empty() {
-                return Err(libsql::Error::Misuse(
-                    "search name must not be empty".to_string(),
-                ));
-            }
-            let clean_name: String = name
-                .chars()
-                .map(|x| {
-                    if x.is_ascii_digit() || x.is_alphabetic() {
-                        x
-                    } else {
-                        ' '
-                    }
-                })
-                .collect();
+// /// searches writers / publishers by name or ipi
+// /// skips writers missing IPI
+// pub fn search_parties(
+//     conn: &Connection,
+//     param: PartyInput,
+//     role: Option<Role>,
+//     limit: usize,
+// ) -> Result<Vec<Party>, rusqlite::Error> {
+//     let mut rows = match param {
+//         PartyInput::Name(name) => {
+//             if name.is_empty() {
+//                 return Err(rusqlite::Error::InvalidQuery);
+//             }
+//
+//             let clean_name: String = name
+//                 .chars()
+//                 .map(|x| {
+//                     if x.is_ascii_digit() || x.is_alphabetic() {
+//                         x
+//                     } else {
+//                         ' '
+//                     }
+//                 })
+//                 .collect();
+//
+//             match &role {
+//                 Some(x) => {
+//                     let sql = "
+//                         SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
+//                         FROM parties p
+//                         JOIN parties_fts ON parties_fts.rowid = p.id
+//                         WHERE parties_fts MATCH ?1 || '*'
+//                         AND p.ipi IS NOT NULL
+//                         AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
+//                         LIMIT ?3";
+//                     conn.query(sql, params!(clean_name, x.to_string(), limit as i64))?
+//                 }
+//                 None => {
+//                     let sql = "
+//                         SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
+//                         FROM parties p
+//                         JOIN parties_fts ON parties_fts.rowid = p.id
+//                         WHERE parties_fts MATCH ?1 || '*'
+//                         AND p.ipi IS NOT NULL
+//                         LIMIT ?2";
+//                     conn.query(sql, params!(clean_name, limit as i64))?
+//                 }
+//             }
+//         }
+//         PartyInput::Ipi(ipi) => match &role {
+//             Some(x) => {
+//                 let sql = "
+//                 SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
+//                 FROM parties p
+//                 WHERE p.ipi = ?1
+//                 AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
+//                 LIMIT ?3";
+//                 conn.query(sql, params!(ipi.0 as i64, x.to_string(), limit as i64))?
+//             }
+//             None => {
+//                 let sql = "
+//                 SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
+//                 FROM parties p
+//                 WHERE p.ipi = ?1
+//                 LIMIT ?2";
+//                 conn.query(sql, params!(ipi.0 as i64, limit as i64))?
+//             }
+//         },
+//     };
+//
+//     let mut v = vec![];
+//     while let Some(row) = rows.next()? {
+//         let w = Party {
+//             id: row.get::<u64>(0)?,
+//             first_name: row.get(1).ok(),
+//             last_name: row.get(2)?,
+//             ipi_name_num: row
+//                 .get::<i64>(3)
+//                 .ok()
+//                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
+//             pro: row
+//                 .get::<u64>(4)
+//                 .ok()
+//                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
+//             role: row
+//                 .get::<String>(5)
+//                 .and_then(|s| Role::from_str(&s).map_err(|_| rusqlite::Error::NullValue))
+//                 .ok(),
+//         };
+//         v.push(w);
+//     }
+//     Ok(v)
+// }
 
-            match &role {
-                Some(x) => {
-                    let sql = "
-                        SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
-                        FROM parties p
-                        JOIN parties_fts ON parties_fts.rowid = p.id
-                        WHERE parties_fts MATCH ?1 || '*'
-                        AND p.ipi IS NOT NULL
-                        AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
-                        LIMIT ?3";
-                    conn.query(sql, params!(clean_name, x.to_string(), limit as i64))
-                        .await?
-                }
-                None => {
-                    let sql = "
-                        SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
-                        FROM parties p
-                        JOIN parties_fts ON parties_fts.rowid = p.id
-                        WHERE parties_fts MATCH ?1 || '*'
-                        AND p.ipi IS NOT NULL
-                        LIMIT ?2";
-                    conn.query(sql, params!(clean_name, limit as i64)).await?
-                }
-            }
-        }
-        PartyInput::Ipi(ipi) => match &role {
-            Some(x) => {
-                let sql = "
-                SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
-                FROM parties p
-                WHERE p.ipi = ?1
-                AND (p.role = ?2 OR p.role IS NULL OR p.role = 'both')
-                LIMIT ?3";
-                conn.query(sql, params!(ipi.0 as i64, x.to_string(), limit as i64))
-                    .await?
-            }
-            None => {
-                let sql = "
-                SELECT p.id, p.first_name, p.last_name, p.ipi, p.pro, p.role
-                FROM parties p
-                WHERE p.ipi = ?1
-                LIMIT ?2";
-                conn.query(sql, params!(ipi.0 as i64, limit as i64)).await?
-            }
-        },
-    };
-
-    let mut v = vec![];
-    while let Some(row) = rows.next().await? {
-        let w = Party {
-            id: row.get::<u64>(0)?,
-            first_name: row.get(1).ok(),
-            last_name: row.get(2)?,
-            ipi_name_num: row
-                .get::<i64>(3)
-                .ok()
-                .and_then(|x| IpiNameNum::new(x as u64).ok()),
-            pro: row
-                .get::<u64>(4)
-                .ok()
-                .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
-            role: row
-                .get::<String>(5)
-                .and_then(|s| Role::from_str(&s).map_err(|_| libsql::Error::NullValue))
-                .ok(),
-        };
-        v.push(w);
-    }
-    Ok(v)
-}
-
-pub async fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, libsql::Error> {
+pub fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, rusqlite::Error> {
     let sql = "
   WITH latest_share AS (
       SELECT s.id, p.id AS party_id
@@ -167,27 +164,28 @@ pub async fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, libsq
           )
       )
   ORDER BY p.average_share DESC";
-    let mut rows = conn.query(sql, params!(20.0)).await?;
+    let mut stmt = conn.prepare(sql)?;
+    let mut rows = stmt.query(params!(20.0))?;
     let mut v = vec![];
-    while let Ok(Some(row)) = rows.next().await {
+    while let Ok(Some(row)) = rows.next() {
         let last = match row.get(2) {
             Ok(x) => x,
             Err(_) => row.get(3)?,
         };
         v.push(Party {
-            id: row.get(0)?,
+            id: row.get::<_, i64>(0)? as u64,
             first_name: row.get(1).ok(),
             last_name: last,
             ipi_name_num: row
-                .get::<i64>(5)
+                .get::<_, i64>(5)
                 .ok()
                 .and_then(|x| IpiNameNum::new(x as u64).ok()),
             pro: row
-                .get::<i64>(4)
+                .get::<_, i32>(4)
                 .ok()
                 .and_then(|x| TisSocietyCode::try_from(x as u16).ok()),
             role: row
-                .get::<String>(6)
+                .get::<_, String>(6)
                 .ok()
                 .and_then(|x| Role::from_str(&x).ok()),
         })

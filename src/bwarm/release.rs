@@ -1,6 +1,6 @@
 use crate::bwarm::interface::BwarmEntry;
 use csv::StringRecord;
-use libsql::params;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -18,7 +18,7 @@ impl<'a> BwarmEntry for Release<'a> {
         "releases.tsv".into()
     }
 
-    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS releases (
             id INTEGER PRIMARY KEY NOT NULL,
@@ -29,11 +29,13 @@ impl<'a> BwarmEntry for Release<'a> {
             release_date INTEGER,
             label_name TEXT NOT NULL
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 
-    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
+    fn prepare<'c>(
+        conn: &'c rusqlite::Connection,
+    ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {
         let sql = "
         INSERT INTO releases (
            id,
@@ -50,13 +52,13 @@ impl<'a> BwarmEntry for Release<'a> {
            ?5,
            ?6
         )";
-        let stmt = conn.prepare(sql).await?;
+        let stmt = conn.prepare(sql)?;
         Ok(stmt)
     }
 
-    async fn insert_from_csv(
+    fn insert_from_csv(
         fields: &StringRecord,
-        stmt: &mut libsql::Statement,
+        stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Release {
             id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
@@ -66,16 +68,14 @@ impl<'a> BwarmEntry for Release<'a> {
             release_date: fields.get(9),
             distro_name: fields.get(8).ok_or("missing distro name")?,
         };
-        _ = stmt
-            .execute(params!(
-                x.id,
-                x.title,
-                x.artist_name,
-                x.distro_name,
-                x.release_date,
-                x.label_name,
-            ))
-            .await?;
+        _ = stmt.execute(params!(
+            x.id,
+            x.title,
+            x.artist_name,
+            x.distro_name,
+            x.release_date,
+            x.label_name,
+        ))?;
         Ok(())
     }
 }

@@ -1,5 +1,5 @@
 use csv::StringRecord;
-use libsql::params;
+use rusqlite::params;
 use serde::{Deserialize, Serialize};
 
 use crate::bwarm::interface::BwarmEntry;
@@ -19,7 +19,7 @@ impl BwarmEntry for Resource<'_> {
         "resources.tsv".into()
     }
 
-    async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS resources (
            -- id TEXT PRIMARY KEY NOT NULL,
@@ -29,11 +29,13 @@ impl BwarmEntry for Resource<'_> {
            isrc TEXT,
            title TEXT NOT NULL
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 
-    async fn prepare(conn: &libsql::Connection) -> Result<libsql::Statement, libsql::Error> {
+    fn prepare<'c>(
+        conn: &'c rusqlite::Connection,
+    ) -> Result<rusqlite::Statement<'c>, rusqlite::Error> {
         let sql = "
         INSERT INTO resources (
            id,
@@ -48,13 +50,13 @@ impl BwarmEntry for Resource<'_> {
            ?4,
            ?5
         )";
-        let stmt = conn.prepare(sql).await?;
+        let stmt = conn.prepare(sql)?;
         Ok(stmt)
     }
 
-    async fn insert_from_csv(
+    fn insert_from_csv(
         fields: &StringRecord,
-        stmt: &mut libsql::Statement,
+        stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let x = Resource {
             id: fields.get(0).ok_or("missing id")?,
@@ -64,15 +66,13 @@ impl BwarmEntry for Resource<'_> {
             isrc: fields.get(2),
             title: fields.get(3).ok_or("missing title")?,
         };
-        _ = stmt
-            .execute(params!(
-                x.id,
-                x.data_provider,
-                x.release_id,
-                x.isrc,
-                x.title,
-            ))
-            .await?;
+        _ = stmt.execute(params!(
+            x.id,
+            x.data_provider,
+            x.release_id as i64,
+            x.isrc,
+            x.title,
+        ))?;
         Ok(())
     }
 }

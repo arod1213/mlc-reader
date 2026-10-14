@@ -10,7 +10,7 @@ use crate::{
     },
     server::{self, Credential},
 };
-use libsql::{Connection, params};
+use rusqlite::{Connection, params};
 use std::path::Path;
 
 mod pks;
@@ -32,163 +32,149 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) {
     server::save_doc::<Resource>(&sftp, &dir, out_dir).expect("failed to save Resources");
 }
 
-pub async fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), libsql::Error> {
-    trim::setup_trim_write_mode(conn).await?;
+pub fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), rusqlite::Error> {
+    trim::setup_trim_write_mode(conn)?;
 
     log::info!("creating shares idx");
-    create_trim_shares_indexes(conn).await?;
+    create_trim_shares_indexes(conn)?;
     log::info!("creating resource pk");
-    create_share_pk(conn).await?;
+    create_share_pk(conn)?;
     log::info!("starting to trim shares");
-    let count = trim::trim_shares(conn).await?;
+    let count = trim::trim_shares(conn)?;
     log::info!("trimmed {count} shares");
 
     log::info!("creating resource pk");
-    create_resource_pk(conn).await?;
+    create_resource_pk(conn)?;
     log::info!("creating trim_works idx");
-    create_trim_works_indexes(conn).await?;
+    create_trim_works_indexes(conn)?;
     log::info!("creating works pk");
-    create_work_pk(conn).await?;
+    create_work_pk(conn)?;
     log::info!("starting to trim works");
-    let count = trim::trim_works(conn).await?;
+    let count = trim::trim_works(conn)?;
     log::info!("trimmed {count} works");
 
     log::info!("creating releases idx");
-    create_trim_releases_indexes(conn).await?;
+    create_trim_releases_indexes(conn)?;
     log::info!("starting to trim releases");
-    let count = trim::trim_releases(conn).await?;
+    let count = trim::trim_releases(conn)?;
     log::info!("trimmed {count} releases");
 
     log::info!("creating parties pk");
-    create_party_pk(conn).await?;
+    create_party_pk(conn)?;
     log::info!("creating parties idx");
-    create_trim_parties_indexes(conn).await?;
+    create_trim_parties_indexes(conn)?;
     log::info!("starting to trim parties");
-    let count = trim::trim_parties(conn).await?;
+    let count = trim::trim_parties(conn)?;
     log::info!("trimmed {count} parties");
 
     if vacuum {
-        _ = conn.execute("VACUUM", params!()).await?;
+        _ = conn.execute("VACUUM", params!())?;
     }
     Ok(())
 }
 
 /// migrate DB and save TSV files into db
-pub async fn migrate_from_bwarm_dump(conn: &Connection, bwarm_dir: &Path) {
-    migrate_schema(conn).await.expect("failed to migrate");
+pub fn migrate_from_bwarm_dump(conn: &mut Connection, bwarm_dir: &Path) {
+    migrate_schema(conn).expect("failed to migrate");
 
-    setup_bulk_write_mode(conn)
-        .await
-        .expect("failed to setup WAL");
-    disable_fk(conn).await.expect("failed to disable FKs");
+    setup_bulk_write_mode(conn).expect("failed to setup WAL");
+    disable_fk(conn).expect("failed to disable FKs");
 
-    save_object::<Release>(conn, bwarm_dir).await.unwrap();
-    save_object::<Resource>(conn, bwarm_dir).await.unwrap();
-    save_object::<Party>(conn, bwarm_dir).await.unwrap();
-    save_object::<Work>(conn, bwarm_dir).await.unwrap();
-    save_object::<WorkResource>(conn, bwarm_dir).await.unwrap();
-    save_object::<Share>(conn, bwarm_dir).await.unwrap();
+    save_object::<Release>(conn, bwarm_dir).unwrap();
+    save_object::<Resource>(conn, bwarm_dir).unwrap();
+    save_object::<Party>(conn, bwarm_dir).unwrap();
+    save_object::<Work>(conn, bwarm_dir).unwrap();
+    save_object::<WorkResource>(conn, bwarm_dir).unwrap();
+    save_object::<Share>(conn, bwarm_dir).unwrap();
 }
 
 /// add new tables and indexes
-pub async fn create_search_tables_indexes(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+pub fn create_search_tables_indexes(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     // modify_parties_migration(conn)?;
     log::info!("creating publisher relations");
-    PublisherRelations::migrate(conn).await?;
+    PublisherRelations::migrate(conn)?;
     log::info!("creating writer relations");
-    WriterRelations::migrate(conn).await?;
+    WriterRelations::migrate(conn)?;
     log::info!("creating search index");
-    create_search_indexes(conn).await?;
+    create_search_indexes(conn)?;
     log::info!("creating party fts");
-    create_party_fts(conn).await?;
+    create_party_fts(conn)?;
     log::info!("creating relation index");
-    create_relation_index(conn).await?;
+    create_relation_index(conn)?;
     log::info!("finished indexes");
     Ok(())
 }
 
-pub async fn create_search_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+pub fn create_search_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     log::info!("creating publisher relation index");
-    create_publisher_relation_index(conn).await?;
+    create_publisher_relation_index(conn)?;
     log::info!("creating party index");
-    create_party_indexes(conn).await?;
+    create_party_indexes(conn)?;
     log::info!("creating share index");
-    create_share_index(conn).await?;
+    create_share_index(conn)?;
     log::info!("creating relation index");
-    create_relation_index(conn).await?;
+    create_relation_index(conn)?;
     log::info!("creating work index");
-    create_work_indexes(conn).await?;
+    create_work_indexes(conn)?;
     Ok(())
 }
 
-pub async fn create_trim_indexes(conn: &Connection) -> Result<(), libsql::Error> {
-    create_trim_shares_indexes(conn).await?;
-    create_trim_works_indexes(conn).await?;
-    create_trim_releases_indexes(conn).await?;
-    create_trim_parties_indexes(conn).await?;
+pub fn create_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    create_trim_shares_indexes(conn)?;
+    create_trim_works_indexes(conn)?;
+    create_trim_releases_indexes(conn)?;
+    create_trim_parties_indexes(conn)?;
     Ok(())
 }
 
-pub async fn create_trim_shares_indexes(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
-            params!(),
-        )
-        .await?;
+pub fn create_trim_shares_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
+        params!(),
+    )?;
     Ok(())
 }
 
-pub async fn create_trim_works_indexes(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
-            params!(),
-        )
-        .await?;
+pub fn create_trim_works_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
+        params!(),
+    )?;
     _ = conn
         .execute(
             "CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource ON work_resources(work_id, resource_id);",
             params!(),
         )
-        .await?;
+        ?;
     Ok(())
 }
 
-pub async fn create_trim_releases_indexes(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id ON resources(release_id, id);",
-            params!(),
-        )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id ON work_resources(resource_id);",
-            params!(),
-        )
-        .await?;
+pub fn create_trim_releases_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id ON resources(release_id, id);",
+        params!(),
+    )?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id ON work_resources(resource_id);",
+        params!(),
+    )?;
     Ok(())
 }
 
-pub async fn create_trim_parties_indexes(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);",
-            params!(),
-        )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
-            params!(),
-        )
-        .await?;
+pub fn create_trim_parties_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);",
+        params!(),
+    )?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
+        params!(),
+    )?;
     Ok(())
 }
 
 /// indicate whether a party is primarily a writer / publisher
-pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
+pub fn assign_roles(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
     let sql = "
     WITH role_counts AS (
         SELECT
@@ -218,29 +204,26 @@ pub async fn assign_roles(conn: &libsql::Transaction) -> Result<(), libsql::Erro
     FROM role_counts
     WHERE role_counts.id = parties.id
     );";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
 /// indicate whether a party is primarily a writer / publisher
-pub async fn add_party_stats(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
+pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
     conn.execute(
         "ALTER TABLE parties ADD COLUMN average_share REAL NOT NULL DEFAULT 0.0;",
         params!(),
-    )
-    .await?;
+    )?;
 
     conn.execute(
         "ALTER TABLE parties ADD COLUMN latest_release INTEGER",
         params!(),
-    )
-    .await?;
+    )?;
 
     conn.execute(
         "ALTER TABLE parties ADD COLUMN work_count INTEGER NOT NULL DEFAULT 0",
         params!(),
-    )
-    .await?;
+    )?;
 
     let sql = "
         WITH party_stats AS (
@@ -267,12 +250,12 @@ pub async fn add_party_stats(conn: &libsql::Transaction) -> Result<(), libsql::E
               0
           );";
 
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
 /// save writer -> publisher and publisher -> publisher instances
-pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+pub fn enrich_publisher_relations(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         WITH relations AS (
             SELECT
@@ -295,12 +278,12 @@ pub async fn enrich_publisher_relations(conn: &libsql::Connection) -> Result<(),
         ON CONFLICT(parent_id, child_id) DO UPDATE
         SET occurrences = occurrences + excluded.occurrences;
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
 /// save writer -> writer instances
-pub async fn enrich_writer_relations(conn: &libsql::Transaction) -> Result<(), libsql::Error> {
+pub fn enrich_writer_relations(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
     let sql = "
           WITH root_writer_shares AS (
               SELECT DISTINCT
@@ -333,7 +316,7 @@ pub async fn enrich_writer_relations(conn: &libsql::Transaction) -> Result<(), l
           ON CONFLICT(writer_a, writer_b) DO UPDATE
           SET occurrences = occurrences + excluded.occurrences;
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
@@ -346,7 +329,7 @@ struct PublisherRelations {
 }
 
 impl PublisherRelations {
-    pub async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    pub fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS publisher_relations (
             parent_id INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
@@ -354,7 +337,7 @@ impl PublisherRelations {
             occurrences INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY(parent_id, child_id)
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 }
@@ -365,7 +348,7 @@ struct WriterRelations {
 }
 
 impl WriterRelations {
-    pub async fn migrate(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+    pub fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
         let sql = "
         CREATE TABLE IF NOT EXISTS writer_relations (
             writer_a INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
@@ -373,7 +356,7 @@ impl WriterRelations {
             occurrences INTEGER NOT NULL DEFAULT 1,
             PRIMARY KEY(writer_a, writer_b)
         )";
-        _ = conn.execute(sql, params!()).await?;
+        _ = conn.execute(sql, params!())?;
         Ok(())
     }
 }
@@ -381,82 +364,74 @@ impl WriterRelations {
 //---------------------------
 // INDEXES
 
-async fn create_party_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+fn create_party_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
-async fn create_publisher_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
+fn create_publisher_relation_index(conn: &Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_publisher_relations_parent_occ
         ON publisher_relations (parent_id, occurrences DESC);
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
         ON publisher_relations (child_id, occurrences DESC);
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
-async fn create_work_indexes(conn: &Connection) -> Result<(), libsql::Error> {
+fn create_work_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource
         ON work_resources(work_id, resource_id);
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
-async fn create_relation_index(conn: &Connection) -> Result<(), libsql::Error> {
+fn create_relation_index(conn: &Connection) -> Result<(), rusqlite::Error> {
     let sql = "
     CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
     ON publisher_relations (child_id, occurrences DESC);
         ";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
 
-async fn create_share_index(conn: &Connection) -> Result<(), libsql::Error> {
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
-            params!(),
-        )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
-            params!(),
-        )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_preceding_party ON shares(preceding_id, party_id);",
-            params!(),
-        )
-        .await?;
+fn create_share_index(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
+        params!(),
+    )?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
+        params!(),
+    )?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_party ON shares(preceding_id, party_id);",
+        params!(),
+    )?;
     _ = conn
         .execute(
             "CREATE INDEX IF NOT EXISTS idx_shares_work_preceeding_shares ON shares(work_id, preceding_id);",
             params!(),
         )
-        .await?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
-            params!(),
-        )
-        .await?;
+        ?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
+        params!(),
+    )?;
 
     Ok(())
 }
 
-pub async fn create_party_fts(conn: &libsql::Connection) -> Result<(), libsql::Error> {
+pub fn create_party_fts(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     let sql = "
         CREATE VIRTUAL TABLE IF NOT EXISTS parties_fts USING fts5(
             full_name,
@@ -464,25 +439,25 @@ pub async fn create_party_fts(conn: &libsql::Connection) -> Result<(), libsql::E
             content_rowid=id,
             tokenize='unicode61'
         );";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
 
     let sql = "
         -- Populate from existing data
         INSERT INTO parties_fts(rowid, full_name)
         SELECT id, full_name FROM parties;";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
 
     let sql = "
         CREATE TRIGGER IF NOT EXISTS parties_fts_insert AFTER INSERT ON parties BEGIN
             INSERT INTO parties_fts(rowid, full_name) VALUES (new.id, new.full_name);
         END;";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
 
     let sql = "
         CREATE TRIGGER IF NOT EXISTS parties_fts_delete AFTER DELETE ON parties BEGIN
             INSERT INTO parties_fts(parties_fts, rowid, full_name) VALUES ('delete', old.id, old.full_name);
         END;";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
 
     let sql = "
         CREATE TRIGGER IF NOT EXISTS parties_fts_update
@@ -494,6 +469,6 @@ pub async fn create_party_fts(conn: &libsql::Connection) -> Result<(), libsql::E
           INSERT INTO parties_fts(rowid, full_name)
           VALUES (new.id, new.full_name);
         END;";
-    _ = conn.execute(sql, params!()).await?;
+    _ = conn.execute(sql, params!())?;
     Ok(())
 }
