@@ -35,6 +35,7 @@ pub struct SearchWorksBody {
 }
 
 #[derive(Deserialize, EnumString)]
+#[strum(serialize_all = "snake_case")]
 pub enum WorkIdentifier {
     Isrc,
     Iswc,

@@ -16,6 +16,7 @@ struct JobConfig {
 
 #[derive(EnumString, Display, Clone, PartialEq, PartialOrd)]
 #[repr(u8)]
+#[strum(serialize_all = "snake_case")]
 enum RunStep {
     SaveDocs = 10,
     Schema = 20,
