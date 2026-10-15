@@ -1,0 +1,16 @@
+[Unit]
+Description=APG MLC Query API
+After=network.service
+
+[Service]
+Type=simple
+User=luminate
+EnvironmentFile=/etc/apg-mlc/environment
+WorkingDirectory=/var/lib/apg-mlc
+StateDirectory=apg-mlc
+ExecStart=/opt/apg-mlc/api
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

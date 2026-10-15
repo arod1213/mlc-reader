@@ -4,8 +4,13 @@ use mlc_reader::migration::trim_db;
 use mlc_reader::migration::utils::disable_fk;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use std::error::Error;
+use std::fs::File;
+use std::io::{self, Write};
 use std::path::PathBuf;
-use std::{env, io::BufReader};
+use std::{
+    env,
+    io::{BufReader, BufWriter},
+};
 use strum::{Display, EnumString};
 
 struct JobConfig {
@@ -104,7 +109,11 @@ fn nightjob(
         RunStepConfig {
             step: RunStep::UpdatePros,
             f: &|db| {
-                let file = std::fs::File::open(&config.update_path)?;
+                let Ok(file) = std::fs::File::open(&config.update_path) else {
+                    eprintln!("update path not found: skipping");
+                    return Ok(());
+                };
+
                 let mut reader = BufReader::new(file);
                 Ok(update_pro_affiliations(&mut reader, db)?)
             },
@@ -141,12 +150,16 @@ fn main() {
         cred,
     };
 
-    let db_url = env::var("DB_URL").expect("missing DB_URL");
-    let mut conn = rusqlite::Connection::open(&db_url).expect("failed to connect to db");
+    let temp_db_url = env::var("TEMP_DB_URL").expect("missing TEMP_DB_URL");
+    let prod_db_url = env::var("DB_URL").expect("missing DB_URL");
+    let mut conn = rusqlite::Connection::open(&temp_db_url).expect("failed to connect to db");
 
     let args = Args::parse();
     match args.command {
-        Command::NightJob { resume_step } => nightjob(&mut conn, config, resume_step).unwrap(),
+        Command::NightJob { resume_step } => {
+            nightjob(&mut conn, config, resume_step).expect("NightJob failed");
+            promote_db(&temp_db_url, &prod_db_url).expect("failed to promote db");
+        }
     }
 }
 
@@ -163,4 +176,14 @@ enum Command {
         #[arg(short, long)]
         resume_step: Option<RunStep>,
     },
+}
+
+fn promote_db(temp_path: &str, prod_path: &str) -> Result<(), Box<dyn Error>> {
+    let temp = File::open(temp_path)?;
+    let prod = File::open(prod_path)?;
+    let mut reader = BufReader::new(temp);
+    let mut writer = BufWriter::new(prod);
+    io::copy(&mut reader, &mut writer)?;
+    writer.flush()?;
+    Ok(())
 }
