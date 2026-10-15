@@ -28,12 +28,19 @@ async fn main() {
     dotenv().ok();
     env_logger::init();
 
-    let db_url = env::var("MLC_DB_URL").expect("missing DB_URL");
+    let port = env::var("PORT").unwrap_or("8080".into());
+    let port: u32 = port.parse().expect("PORT must be a valid number");
+
+    let db_url = env::var("DB_URL").expect("missing DB_URL");
     let state = api::state::State { db_url };
 
     // let origins = ["http://localhost:5173".parse().unwrap()];
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PUT])
+        .allow_methods([
+            Method::GET,
+            // Method::POST,
+            // Method::PUT
+        ])
         .allow_headers(Any)
         .allow_origin(Any)
         .expose_headers([axum::http::header::CONTENT_DISPOSITION]);
@@ -58,6 +65,7 @@ async fn main() {
         .with_state(state)
         .layer(cors);
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let listen_on = format!("0.0.0.0:{}", port);
+    let listener = tokio::net::TcpListener::bind(listen_on).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

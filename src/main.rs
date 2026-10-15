@@ -9,7 +9,7 @@ use std::{env, io::BufReader};
 use strum::{Display, EnumString};
 
 struct JobConfig {
-    out_dir: PathBuf,
+    tsv_dir: PathBuf,
     update_path: PathBuf,
     cred: Credential,
 }
@@ -44,12 +44,12 @@ fn nightjob(
     let steps = [
         RunStepConfig {
             step: RunStep::SaveDocs,
-            f: &|_| migration::save_remote_mlc_docs(&config.cred, &config.out_dir),
+            f: &|_| migration::save_remote_mlc_docs(&config.cred, &config.tsv_dir),
         },
         RunStepConfig {
             step: RunStep::Schema,
             f: &|db| {
-                migration::migrate_from_bwarm_dump(db, &config.out_dir)
+                migration::migrate_from_bwarm_dump(db, &config.tsv_dir)
                     .map_err(|e| e as Box<dyn Error>)
             },
         },
@@ -132,16 +132,16 @@ fn main() {
         public_key: env::var("MLC_PUBLIC_KEY").unwrap().into(),
         private_key: env::var("MLC_PRIVATE_KEY").unwrap().into(),
     };
-    let out_dir: PathBuf = env::var("OUT_DIR").expect("missing OUT_DIR").into();
+    let tsv_dir: PathBuf = env::var("TSV_DIR").expect("missing TSV_DIR").into();
     let update_path: PathBuf = env::var("UPDATE_PATH").expect("missing UPDATE_PATH").into();
 
     let config = JobConfig {
-        out_dir,
+        tsv_dir,
         update_path,
         cred,
     };
 
-    let db_url = env::var("MLC_DB_URL").expect("missing MLC_DB_URL");
+    let db_url = env::var("DB_URL").expect("missing DB_URL");
     let mut conn = rusqlite::Connection::open(&db_url).expect("failed to connect to db");
 
     let args = Args::parse();
