@@ -26,12 +26,12 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box
     log::debug!("dir is {:?}", dir);
 
     // TODO: make multithreaded (too slow rn)
-    server::save_doc::<Party>(&sftp, &dir, out_dir)?;
-    server::save_doc::<Work>(&sftp, &dir, out_dir)?;
-    server::save_doc::<WorkResource>(&sftp, &dir, out_dir)?;
-    server::save_doc::<Share>(&sftp, &dir, out_dir)?;
-    server::save_doc::<Release>(&sftp, &dir, out_dir)?;
-    server::save_doc::<Resource>(&sftp, &dir, out_dir)?;
+    server::save_doc::<Party>(&sftp, &dir, out_dir).expect("missing parties file");
+    server::save_doc::<Work>(&sftp, &dir, out_dir).expect("missing work file");
+    server::save_doc::<WorkResource>(&sftp, &dir, out_dir).expect("missing work resource file");
+    server::save_doc::<Share>(&sftp, &dir, out_dir).expect("missing share file");
+    server::save_doc::<Release>(&sftp, &dir, out_dir).expect("missing release file");
+    server::save_doc::<Resource>(&sftp, &dir, out_dir).expect("missing resource file");
     Ok(())
 }
 

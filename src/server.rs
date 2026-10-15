@@ -1,6 +1,6 @@
 use std::{
     fs::File,
-    io::{self, BufReader, BufWriter},
+    io::{self, BufReader, BufWriter, Write},
     net::TcpStream,
     path::{Path, PathBuf},
 };
@@ -23,7 +23,7 @@ impl Credential {
         let tcp = TcpStream::connect(&self.host)?;
         let mut session = Session::new()?;
         session.set_tcp_stream(tcp);
-        session.handshake().unwrap();
+        session.handshake()?;
 
         session.userauth_pubkey_file(
             &self.username,
@@ -54,11 +54,14 @@ pub fn save_doc<T: BwarmEntry>(
     log::debug!("looking for {:?}", latest_file);
     let file = ftp.open(latest_file)?;
     let outpath = out_dir.join(T::filename());
+
+    std::fs::create_dir_all(out_dir)?;
     let output = File::create(outpath)?;
 
-    let capacity = 128 * 1024;
+    let capacity = 4 * 1024 * 1024; // 4 mb
     let mut reader = BufReader::with_capacity(capacity, file);
     let mut writer = BufWriter::with_capacity(capacity, output);
     io::copy(&mut reader, &mut writer)?;
+    writer.flush()?;
     Ok(())
 }

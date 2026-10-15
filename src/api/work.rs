@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use serde::Deserialize;
 
@@ -28,31 +28,27 @@ pub async fn get_work(
 }
 
 #[derive(Deserialize)]
-pub struct SearchWorksBody {
-    pub identifiers: Vec<String>,
-    pub method: WorkIdentifier,
-}
-
-#[derive(Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WorkIdentifier {
     Isrc,
     Iswc,
 }
 
+#[derive(Deserialize)]
+pub struct SearchWorksQuery {
+    pub method: WorkIdentifier,
+    pub codes: Vec<String>,
+}
+
 pub async fn search_works_by_codes(
     State(state): State<state::State>,
-    Json(body): Json<SearchWorksBody>,
+    Query(query): Query<SearchWorksQuery>,
 ) -> Result<Json<Envelope<HashMap<String, Vec<WorkInfo>>>>, ApiError> {
     let conn = rusqlite::Connection::open(&state.db_url)?;
 
-    let works = match body.method {
-        WorkIdentifier::Isrc => {
-            query::works::search_works_by_isrcs(&conn, body.identifiers.as_slice())?
-        }
-        WorkIdentifier::Iswc => {
-            query::works::search_works_by_iswcs(&conn, body.identifiers.as_slice())?
-        }
+    let works = match query.method {
+        WorkIdentifier::Isrc => query::works::search_works_by_isrcs(&conn, query.codes.as_slice())?,
+        WorkIdentifier::Iswc => query::works::search_works_by_iswcs(&conn, query.codes.as_slice())?,
     };
     Ok(Envelope::ok(works))
 }

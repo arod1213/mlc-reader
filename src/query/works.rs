@@ -2,50 +2,83 @@ use std::collections::HashMap;
 
 use musicmeta::tis::society::TisSocietyCode;
 use rusqlite::{ToSql, params, params_from_iter};
+use serde::Deserialize;
 
 use crate::query::types::{PartyInfo, Release, Share, WorkInfo};
+
+fn default_limit() -> usize {
+    200
+}
+#[derive(Deserialize)]
+pub struct PartyWorksQuery {
+    #[serde(default)]
+    pub with_id: Option<u64>,
+
+    pub in_dispute: Option<bool>,
+
+    #[serde(default = "default_limit")]
+    pub limit: usize,
+
+    #[serde(default)]
+    pub page: usize,
+
+    #[serde(default)]
+    pub is_deep: bool,
+}
 
 pub fn get_party_works(
     db: &rusqlite::Connection,
     party_id: u64,
-    with_id: Option<u64>,
-    is_deep: bool,
+    params: PartyWorksQuery,
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
-    let limit = 200;
-    let q = if with_id.is_some() {
+    let limit = params.limit.min(200);
+    let offset = params.limit * params.page;
+
+    let in_dispute_clause = if params.in_dispute.is_some() {
+        "in_dispute = ?3"
+    } else {
+        "?3 IS NULL"
+    };
+
+    let with_id_clause = if params.with_id.is_some() {
+        "EXISTS (
+                SELECT 1
+                FROM shares
+                WHERE party_id = ?2
+                AND work_id = wk.id
+            )"
+    } else {
+        "?2 IS NULL"
+    };
+
+    let q = format!(
         "
             SELECT wk.id
             FROM shares s
             JOIN works wk on wk.id = s.work_id
             WHERE s.party_id = ?1
-            AND EXISTS (
-                SELECT 1
-                FROM shares
-                WHERE party_id = ?2
-                AND work_id = wk.id
-            )
-            LIMIT ?3
+            AND {with_id_clause}
+            AND {in_dispute_clause}
+            LIMIT ?4
+            OFFSET ?5
         "
-    } else {
-        "
-        SELECT wk.id
-        FROM shares s
-        JOIN works wk on wk.id = s.work_id
-        WHERE s.party_id = ?1
-        AND ?2 IS NULL
-        LIMIT ?3
-        "
-    };
+    );
 
-    let mut stmt = db.prepare(q)?;
+    let mut stmt = db.prepare(&q)?;
     let work_ids = stmt
         .query_map(
-            params![party_id as i64, with_id.map(|x| x as i64), limit],
+            params![
+                party_id as i64,
+                params.with_id.map(|x| x as i64),
+                params.in_dispute,
+                limit as i64,
+                offset as i64
+            ],
             |row| row.get::<_, String>(0),
         )?
         .collect::<Result<Vec<_>, _>>()?;
 
-    get_works(db, work_ids.as_slice(), is_deep)
+    get_works(db, work_ids.as_slice(), params.is_deep)
 }
 
 pub fn get_works<T: AsRef<str> + ToSql>(
