@@ -9,7 +9,6 @@
 *.tsv
 *.db-wal
 *.db-shm
-Sample Data/
-/mlc-bwarm
-/mlc-sample
+/data
+/sqlite-tmp
 /web_demo
