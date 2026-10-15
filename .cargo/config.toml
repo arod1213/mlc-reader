@@ -1,12 +1,12 @@
-[source.crates-io]
-replace-with = "vendored-sources"
-
-[source."git+https://github.com/arod1213/musicmeta.git"]
-git = "https://github.com/arod1213/musicmeta.git"
-replace-with = "vendored-sources"
-
-[source.vendored-sources]
-directory = "vendor"
+# [source.crates-io]
+# replace-with = "vendored-sources"
+#
+# [source."git+https://github.com/arod1213/musicmeta.git"]
+# git = "https://github.com/arod1213/musicmeta.git"
+# replace-with = "vendored-sources"
+#
+# [source.vendored-sources]
+# directory = "vendor"
 
 [net]
 git-fetch-with-cli = true
