@@ -1,8 +1,8 @@
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     api::{
@@ -46,13 +46,20 @@ pub async fn get_party_collaborators(
     Ok(Envelope::ok(collab))
 }
 
+#[derive(Deserialize)]
+pub struct PartyWorksQuery {
+    #[serde(default)]
+    pub with_id: Option<u64>,
+}
+
 pub async fn get_party_works(
     State(state): State<state::State>,
+    Query(query): Query<PartyWorksQuery>,
     Path(id): Path<u64>,
 ) -> Result<Json<Envelope<Vec<WorkInfo>>>, ApiError> {
     let conn = rusqlite::Connection::open(&state.db_url)?;
 
-    let works = query::works::get_party_works(&conn, id, true)?;
+    let works = query::works::get_party_works(&conn, id, query.with_id, true)?;
     Ok(Envelope::ok(works))
 }
 

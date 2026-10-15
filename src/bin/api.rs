@@ -47,6 +47,8 @@ async fn main() {
         .route("/parties/{key}", get(search_parties))
         // get party details
         .route("/party/{id}", get(get_party))
+        // get party details
+        .route("/party/{id}/collaborators", get(get_party))
         // get party works
         .route("/party/{id}/works", get(get_party_works));
 

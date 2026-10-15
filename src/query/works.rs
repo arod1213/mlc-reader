@@ -8,21 +8,41 @@ use crate::query::types::{PartyInfo, Release, Share, WorkInfo};
 pub fn get_party_works(
     db: &rusqlite::Connection,
     party_id: u64,
+    with_id: Option<u64>,
     is_deep: bool,
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let limit = 200;
-    let q = "
+    let q = if with_id.is_some() {
+        "
+            SELECT wk.id
+            FROM shares s
+            JOIN works wk on wk.id = s.work_id
+            WHERE s.party_id = ?1
+            AND EXISTS (
+                SELECT 1
+                FROM shares
+                WHERE party_id = ?2
+                AND work_id = wk.id
+            )
+            LIMIT ?3
+        "
+    } else {
+        "
         SELECT wk.id
         FROM shares s
         JOIN works wk on wk.id = s.work_id
         WHERE s.party_id = ?1
-        LIMIT ?2
-        ";
+        AND ?2 IS NULL
+        LIMIT ?3
+        "
+    };
+
     let mut stmt = db.prepare(q)?;
     let work_ids = stmt
-        .query_map(params![party_id as i64, limit], |row| {
-            row.get::<_, String>(0)
-        })?
+        .query_map(
+            params![party_id as i64, with_id.map(|x| x as i64), limit],
+            |row| row.get::<_, String>(0),
+        )?
         .collect::<Result<Vec<_>, _>>()?;
 
     get_works(db, work_ids.as_slice(), is_deep)

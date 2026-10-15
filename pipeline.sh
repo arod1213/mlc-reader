@@ -15,4 +15,4 @@ export RUST_LOG=debug
 mkdir -p "$SQLITE_TMPDIR"
 chmod 700 "$SQLITE_TMPDIR"
 
-$BIN nightjob
+$BIN night-job
