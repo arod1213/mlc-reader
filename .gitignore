@@ -11,3 +11,5 @@
 *.db-shm
 Sample Data/
 /mlc-bwarm
+/mlc-sample
+/web_demo
