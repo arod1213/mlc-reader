@@ -17,6 +17,7 @@ struct JobConfig {
     tsv_dir: PathBuf,
     update_path: PathBuf,
     cred: Credential,
+    should_trim: bool,
 }
 
 #[derive(EnumString, Display, Clone, PartialEq, PartialOrd)]
@@ -61,7 +62,9 @@ fn nightjob(
         RunStepConfig {
             step: RunStep::Trim,
             f: &|db| {
-                trim_db(db, true)?;
+                if config.should_trim {
+                    trim_db(db, true)?;
+                }
                 Ok(())
             },
         },
@@ -144,19 +147,24 @@ fn main() {
     let tsv_dir: PathBuf = env::var("TSV_DIR").expect("missing TSV_DIR").into();
     let update_path: PathBuf = env::var("UPDATE_PATH").expect("missing UPDATE_PATH").into();
 
-    let config = JobConfig {
-        tsv_dir,
-        update_path,
-        cred,
-    };
-
     let temp_db_url = env::var("TEMP_DB_URL").expect("missing TEMP_DB_URL");
     let prod_db_url = env::var("DB_URL").expect("missing DB_URL");
     let mut conn = rusqlite::Connection::open(&temp_db_url).expect("failed to connect to db");
 
     let args = Args::parse();
     match args.command {
-        Command::NightJob { resume_step } => {
+        Command::Migrate { path } => {
+            let conn = rusqlite::Connection::open(path).expect("failed to open db");
+            migration::migrate_full_db(&conn).expect("failed to migrate");
+        }
+        Command::NightJob { resume_step, trim } => {
+            let config = JobConfig {
+                tsv_dir,
+                update_path,
+                cred,
+                should_trim: trim,
+            };
+
             nightjob(&mut conn, config, resume_step).expect("NightJob failed");
             promote_db(&temp_db_url, &prod_db_url).expect("failed to promote db");
         }
@@ -172,13 +180,24 @@ struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    Migrate {
+        #[arg(short, long)]
+        path: PathBuf,
+    },
     NightJob {
+        #[arg(short, long)]
+        trim: bool,
+
         #[arg(short, long)]
         resume_step: Option<RunStep>,
     },
 }
 
 fn promote_db(temp_path: &str, prod_path: &str) -> Result<(), Box<dyn Error>> {
+    if temp_path == prod_path {
+        return Ok(());
+    }
+
     let temp = File::open(temp_path)?;
     let prod = File::open(prod_path)?;
     let mut reader = BufReader::new(temp);

@@ -174,7 +174,7 @@ pub fn top_unsigned_writers(conn: &Connection) -> Result<Vec<Party>, rusqlite::E
         };
         v.push(Party {
             id: row.get::<_, i64>(0)? as u64,
-            first_name: row.get(1).ok(),
+            first_name: row.get(1)?,
             last_name: last,
             ipi_name_num: row
                 .get::<_, i64>(5)

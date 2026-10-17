@@ -4,6 +4,15 @@ use chrono::NaiveDate;
 use musicmeta::{ipi::IpiNameNum, isrc::Isrc, iswc::Iswc, tis::society::TisSocietyCode};
 use serde::{Deserialize, Serialize};
 
+#[derive(Serialize)]
+pub struct PartyMeta {
+    pub party_id: u64,
+    pub isrcs: Vec<String>,
+    pub num_works: usize,
+    pub total_shares: f32,
+    pub avg_share: f32,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Party {
     pub id: u64,

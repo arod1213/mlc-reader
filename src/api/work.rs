@@ -2,8 +2,9 @@ use std::collections::HashMap;
 
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Path, State},
 };
+use rusqlite::OpenFlags;
 use serde::Deserialize;
 
 use crate::{
@@ -18,7 +19,8 @@ pub async fn get_work(
     State(state): State<state::State>,
     Path(id): Path<String>,
 ) -> Result<Json<Envelope<Vec<WorkInfo>>>, ApiError> {
-    let conn = rusqlite::Connection::open(&state.db_url)?;
+    let conn =
+        rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
     let works = query::works::get_works(&conn, &[&id], true)?;
     if works.is_empty() {
@@ -35,20 +37,21 @@ pub enum WorkIdentifier {
 }
 
 #[derive(Deserialize)]
-pub struct SearchWorksQuery {
+pub struct SearchWorksBody {
     pub method: WorkIdentifier,
     pub codes: Vec<String>,
 }
 
 pub async fn search_works_by_codes(
     State(state): State<state::State>,
-    Query(query): Query<SearchWorksQuery>,
+    Json(body): Json<SearchWorksBody>,
 ) -> Result<Json<Envelope<HashMap<String, Vec<WorkInfo>>>>, ApiError> {
-    let conn = rusqlite::Connection::open(&state.db_url)?;
+    let conn =
+        rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
-    let works = match query.method {
-        WorkIdentifier::Isrc => query::works::search_works_by_isrcs(&conn, query.codes.as_slice())?,
-        WorkIdentifier::Iswc => query::works::search_works_by_iswcs(&conn, query.codes.as_slice())?,
+    let works = match body.method {
+        WorkIdentifier::Isrc => query::works::search_works_by_isrcs(&conn, body.codes.as_slice())?,
+        WorkIdentifier::Iswc => query::works::search_works_by_iswcs(&conn, body.codes.as_slice())?,
     };
     Ok(Envelope::ok(works))
 }

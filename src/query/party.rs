@@ -1,9 +1,10 @@
 use std::str::FromStr;
 
 use musicmeta::tis::society::TisSocietyCode;
-use rusqlite::params;
+use rusqlite::{ToSql, params, params_from_iter};
+use serde::Deserialize;
 
-use crate::query::types::{Party, PartyInput, Role};
+use crate::query::types::{Party, PartyInput, PartyMeta, Role};
 
 pub fn get_party(db: &rusqlite::Connection, id: u64) -> Result<Party, rusqlite::Error> {
     let q = "
@@ -21,16 +22,14 @@ pub fn get_party(db: &rusqlite::Connection, id: u64) -> Result<Party, rusqlite::
     let party = db.query_one(q, params![id as i64], |row| {
         Ok(Party {
             id,
-            first_name: row.get(1).ok(),
+            first_name: row.get(1)?,
             last_name: row.get(2)?,
-            ipi_name_num: row.get::<_, i64>(3).ok().map(|x| x as u64),
+            ipi_name_num: row.get::<_, Option<i64>>(3)?.map(|x| x as u64),
             pro: row
-                .get::<_, i64>(4)
-                .ok()
+                .get::<_, Option<i64>>(4)?
                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
             role: row
-                .get::<_, String>(5)
-                .ok()
+                .get::<_, Option<String>>(5)?
                 .and_then(|x| Role::from_str(&x).ok()),
         })
     })?;
@@ -47,7 +46,7 @@ pub fn search_parties(
             if name.is_empty() {
                 return Err(rusqlite::Error::InvalidQuery);
             }
-            log::info!("searching {name} by name");
+
             let q = "
             SELECT 
                 p.id, 
@@ -79,14 +78,12 @@ pub fn search_parties(
                     id: row.get::<_, i64>(0)? as u64,
                     first_name: first,
                     last_name: last,
-                    ipi_name_num: row.get::<_, i64>(4).ok().map(|x| x as u64),
+                    ipi_name_num: row.get::<_, Option<i64>>(4)?.map(|x| x as u64),
                     pro: row
-                        .get::<_, i64>(5)
-                        .ok()
+                        .get::<_, Option<i64>>(5)?
                         .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
                     role: row
-                        .get::<_, String>(6)
-                        .ok()
+                        .get::<_, Option<String>>(6)?
                         .and_then(|s| Role::from_str(&s).ok()),
                 })
             })?
@@ -123,14 +120,12 @@ pub fn search_parties(
                     id: row.get::<_, i64>(0)? as u64,
                     first_name: first,
                     last_name: last,
-                    ipi_name_num: row.get::<_, i64>(4).ok().map(|x| x as u64),
+                    ipi_name_num: row.get::<_, Option<i64>>(4)?.map(|x| x as u64),
                     pro: row
-                        .get::<_, i64>(5)
-                        .ok()
+                        .get::<_, Option<i64>>(5)?
                         .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
                     role: row
-                        .get::<_, String>(6)
-                        .ok()
+                        .get::<_, Option<String>>(6)?
                         .and_then(|s| Role::from_str(&s).ok()),
                 })
             })?
@@ -189,16 +184,64 @@ pub fn get_party_collaborators(
             id: row.get::<_, i64>(0)? as u64,
             first_name: first,
             last_name: last,
-            ipi_name_num: row.get::<_, i64>(4).ok().map(|x| x as u64),
+            ipi_name_num: row.get::<_, Option<i64>>(4)?.map(|x| x as u64),
             pro: row
-                .get::<_, i64>(5)
-                .ok()
+                .get::<_, Option<i64>>(5)?
                 .and_then(|v| TisSocietyCode::try_from(v as u16).ok()),
             role: row
-                .get::<_, String>(6)
-                .ok()
+                .get::<_, Option<String>>(6)?
                 .and_then(|s| Role::from_str(&s).ok()),
         })
     })?;
+    rows.collect()
+}
+
+pub fn parties_by_market_share<T: AsRef<str> + ToSql>(
+    db: &rusqlite::Connection,
+    isrcs: &[T],
+) -> Result<Vec<PartyMeta>, rusqlite::Error> {
+    let placeholders = vec!["?"; isrcs.len()].join(", ");
+    let q = format!(
+        "
+        WITH matched_resources AS (
+            SELECT id, isrc
+            FROM resources
+            WHERE isrc IN ({placeholders})
+        ), matched_works AS (
+            SELECT
+              r.isrc,
+              wk.id as id
+            FROM matched_resources r
+            JOIN work_resources wr ON wr.resource_id = r.id
+            JOIN works wk on wk.id = wr.work_id
+        )
+        SELECT 
+            s.party_id,
+            COUNT(*) as num_works,
+            SUM(s.share) as total_shares
+        FROM shares s
+        WHERE s.work_id IN (SELECT mw.id FROM matched_works mw)
+        GROUP BY 1
+        "
+    );
+
+    let mut stmt = db.prepare(&q)?;
+    let rows = stmt.query_map(params_from_iter(isrcs.iter()), |row| {
+        let num_works: usize = row.get::<_, i64>(1)? as usize;
+        let total_shares: f32 = row.get(2)?;
+        let avg_share = if num_works == 0 {
+            0.0
+        } else {
+            total_shares / (num_works as f32)
+        };
+        Ok(PartyMeta {
+            party_id: row.get::<_, i64>(0)? as u64,
+            isrcs: vec![],
+            num_works,
+            total_shares,
+            avg_share,
+        })
+    })?;
+
     rows.collect()
 }

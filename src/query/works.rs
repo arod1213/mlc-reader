@@ -126,14 +126,13 @@ pub fn get_works<T: AsRef<str> + ToSql>(
         let w = WorkInfo {
             id: row.get(0)?,
             title: row.get(1)?,
-            duration_ms: row.get(2).ok(),
+            duration_ms: row.get(2)?,
             iswc: row.get::<_, Option<String>>(3)?,
             in_dispute: row.get(4)?,
             parties: vec![],
             total_shares: row.get(5)?,
             releases: row
-                .get::<_, String>(6)
-                .ok()
+                .get::<_, Option<String>>(6)?
                 .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
                 .unwrap_or_default(),
         };
@@ -197,14 +196,12 @@ pub fn get_works_parties<T: ToString + ToSql>(
             let p = PartyInfo {
                 id: row.get::<_, i64>(1)? as u64,
                 full_name: row.get(2)?,
-                ipi: row.get::<_, i64>(3).ok().map(|x| x as u64),
+                ipi: row.get::<_, Option<i64>>(3)?.map(|x| x as u64),
                 pro: row
-                    .get::<_, i32>(4)
-                    .ok()
+                    .get::<_, Option<i32>>(4)?
                     .and_then(|x| TisSocietyCode::try_from(x as u16).ok()),
                 shares: row
-                    .get::<_, String>(5)
-                    .ok()
+                    .get::<_, Option<String>>(5)?
                     .and_then(|s| serde_json::from_str::<Vec<Share>>(&s).ok())
                     .unwrap_or_default(),
             };

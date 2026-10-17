@@ -17,6 +17,14 @@ mod pks;
 mod trim;
 pub mod utils;
 
+pub fn migrate_full_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+    migrate_schema(conn)?;
+    create_search_tables_indexes(conn)?;
+    migrate_party_stats_fields(conn)?;
+    migrate_work_totals_fields(conn)?;
+    Ok(())
+}
+
 /// save TSV files from SFTP
 pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let sftp = cred.open().unwrap();
@@ -215,8 +223,7 @@ pub fn assign_roles(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error>
     Ok(())
 }
 
-/// indicate whether a party is primarily a writer / publisher
-pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
+fn migrate_party_stats_fields(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     conn.execute(
         "ALTER TABLE parties ADD COLUMN average_share REAL NOT NULL DEFAULT 0.0;",
         params!(),
@@ -231,7 +238,12 @@ pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Err
         "ALTER TABLE parties ADD COLUMN work_count INTEGER NOT NULL DEFAULT 0",
         params!(),
     )?;
+    Ok(())
+}
 
+/// indicate whether a party is primarily a writer / publisher
+pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
+    migrate_party_stats_fields(conn)?;
     let sql = "
         WITH party_stats AS (
           SELECT
@@ -261,12 +273,17 @@ pub fn add_party_stats(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Err
     Ok(())
 }
 
-/// save writer -> publisher and publisher -> publisher instances
-pub fn enrich_work_totals(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+fn migrate_work_totals_fields(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     _ = conn.execute(
         "ALTER TABLE works ADD COLUMN total_shares REAL NOT NULL DEFAULT 0;",
         [],
     )?;
+    Ok(())
+}
+
+/// save writer -> publisher and publisher -> publisher instances
+pub fn enrich_work_totals(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+    migrate_work_totals_fields(conn)?;
 
     let sql = "
         WITH totals AS (

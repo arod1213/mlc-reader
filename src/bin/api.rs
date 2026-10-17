@@ -5,12 +5,12 @@ use axum::{
     extract::State,
     http::{Method, StatusCode},
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
 };
 use dotenv::dotenv;
 use mlc_reader::api::{
     self,
-    party::{get_party, get_party_collaborators, get_party_works, search_parties},
+    party::{get_party, get_party_collaborators, get_party_ranks, get_party_works, search_parties},
     work::{get_work, search_works_by_codes},
 };
 use tower_http::cors::{Any, CorsLayer};
@@ -38,7 +38,7 @@ async fn main() {
     let cors = CorsLayer::new()
         .allow_methods([
             Method::GET,
-            // Method::POST,
+            Method::POST,
             // Method::PUT
         ])
         .allow_headers(Any)
@@ -47,7 +47,9 @@ async fn main() {
 
     let api = Router::new()
         // find works by ISRCs or ISWCs
-        .route("/works", get(search_works_by_codes))
+        .route("/works", post(search_works_by_codes))
+        // find top writers/publishers by total share / avg share / etc
+        .route("/works/top-parties", post(get_party_ranks))
         // get one work (with more info)
         .route("/work/{id}", get(get_work))
         // find parties by Name or IPI
