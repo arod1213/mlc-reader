@@ -79,7 +79,9 @@ pub fn get_party_works(
         )?
         .collect::<Result<Vec<_>, _>>()?;
 
-    get_works(db, work_ids.as_slice(), 1_000, params.is_deep)
+    let mut works = get_works(db, work_ids.as_slice(), 1_000, params.is_deep)?;
+    works.sort_by(|x, y| x.title.cmp(&y.title));
+    Ok(works)
 }
 
 fn get_releases<T: AsRef<str> + ToSql>(
@@ -167,6 +169,7 @@ pub fn get_works<T: AsRef<str> + ToSql>(
         FROM works wk
         WHERE wk.id IN ({placeholders})
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
+        ORDER BY 2 ASC
         "
     );
 
@@ -371,18 +374,22 @@ pub fn search_works_by_title(
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let artist_condition = if artist.is_some() {
         "
-        JOIN work_resources wr on wr.work_id = wk.id
-        JOIN resources rs on rs.id = wr.resource_id AND rs.release_id IS NOT NULL
-        JOIN releases r on r.id = rs.release_id
-        WHERE r.artist_name LIKE ?2 || '%' 
-            AND r.artist_name IS NOT NULL
+        WHERE EXISTS (
+            SELECT 1
+            FROM work_resources wr
+            JOIN resources rs ON rs.id = wr.resource_id
+            JOIN releases r   ON r.id = rs.release_id
+            WHERE wr.work_id = wk.id
+              AND r.artist_name IS NOT NULL
+              AND r.artist_name LIKE ?2 || '%'
+        )
         "
     } else {
         "WHERE ?2 is null"
     };
     let q = format!(
         "
-        SELECT
+        SELECT DISTINCT
           wk.id,
           wk.title,
           wk.duration_ms,
