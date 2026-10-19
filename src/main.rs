@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenv::dotenv;
-use mlc_reader::migration::utils::disable_fk;
-use mlc_reader::migration::{setup_trim_indexes, trim_db};
+use mlc_reader::migration::index::{create_relationship_indexes, setup_indexes};
+use mlc_reader::migration::setup::disable_fk;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use std::error::Error;
 use std::fs::File;
@@ -17,7 +17,6 @@ struct JobConfig {
     tsv_dir: PathBuf,
     update_path: PathBuf,
     cred: Credential,
-    should_trim: bool,
 }
 
 #[derive(EnumString, Display, Clone, PartialEq, PartialOrd)]
@@ -26,14 +25,13 @@ struct JobConfig {
 enum RunStep {
     SaveDocs = 10,
     Schema = 20,
-    Trim = 30,
-    IndexSearch = 40,
-    EnrichWriter = 50,
-    EnrichPublisher = 60,
-    EnrichRoles = 70,
-    EnrichShares = 80,
-    EnrichWorks = 90,
-    UpdatePros = 100,
+    Indexes = 30,
+    EnrichWriter = 40,
+    EnrichPublisher = 50,
+    EnrichRoles = 60,
+    EnrichShares = 70,
+    EnrichWorks = 80,
+    UpdatePros = 90,
 }
 
 type RunFn<'a> = &'a dyn Fn(&mut rusqlite::Connection) -> Result<(), Box<dyn Error>>;
@@ -51,30 +49,22 @@ fn nightjob(
     let steps = [
         RunStepConfig {
             step: RunStep::SaveDocs,
-            f: &|_| migration::save_remote_mlc_docs(&config.cred, &config.tsv_dir),
+            f: &|_| migration::save_mlc_tsv_files(&config.cred, &config.tsv_dir),
         },
         RunStepConfig {
             step: RunStep::Schema,
             f: &|db| {
-                migration::migrate_from_bwarm_dump(db, &config.tsv_dir)
+                migration::insert_tsv_files_to_db(db, &config.tsv_dir)
                     .map_err(|e| e as Box<dyn Error>)
             },
         },
         RunStepConfig {
-            step: RunStep::Trim,
+            step: RunStep::Indexes,
             f: &|db| {
-                if config.should_trim {
-                    trim_db(db, true)?;
-                } else {
-                    log::info!("skipping trim step: creatind IDX instead");
-                    setup_trim_indexes(db)?
-                }
+                setup_indexes(db)?;
+                create_relationship_indexes(db)?;
                 Ok(())
             },
-        },
-        RunStepConfig {
-            step: RunStep::IndexSearch,
-            f: &|db| Ok(migration::create_relationship_indexes(db)?),
         },
         RunStepConfig {
             step: RunStep::EnrichWriter,
@@ -164,21 +154,19 @@ fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Indexes {} => setup_trim_indexes(&conn).expect("failed to create indexes"),
+        Command::Indexes {} => setup_indexes(&conn).expect("failed to create indexes"),
         Command::Migrate { path } => {
             let conn = rusqlite::Connection::open(path).expect("failed to open db");
             migration::migrate_full_db(&conn).expect("failed to migrate");
         }
         Command::NightJob {
             resume_step,
-            trim,
             step_count,
         } => {
             let config = JobConfig {
                 tsv_dir,
                 update_path,
                 cred,
-                should_trim: trim,
             };
 
             nightjob(&mut conn, config, resume_step, step_count).expect("NightJob failed");
@@ -204,9 +192,6 @@ enum Command {
         path: PathBuf,
     },
     NightJob {
-        #[arg(short, long)]
-        trim: bool,
-
         #[arg(short, long)]
         resume_step: Option<RunStep>,
 

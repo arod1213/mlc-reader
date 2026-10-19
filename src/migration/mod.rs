@@ -4,29 +4,30 @@ use crate::{
         work_resource::WorkResource, works::Work,
     },
     migration::{
-        pks::{create_party_pk, create_resource_pk, create_share_pk, create_work_pk},
-        trim::setup_bulk_write_mode,
-        utils::{disable_fk, migrate_schema, save_object},
+        setup::{disable_fk, setup_bulk_write_mode},
+        utils::{migrate_schema, save_object},
     },
     server::{self, Credential},
 };
 use rusqlite::{Connection, params};
 use std::{error::Error, path::Path};
 
+pub mod index;
 mod pks;
-mod trim;
+pub mod relations;
+pub mod setup;
 pub mod utils;
 
 pub fn migrate_full_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     migrate_schema(conn)?;
-    create_relationship_indexes(conn)?;
+    index::create_relationship_indexes(conn)?;
     migrate_party_stats_fields(conn)?;
     migrate_work_totals_fields(conn)?;
     Ok(())
 }
 
 /// save TSV files from SFTP
-pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box<dyn Error>> {
+pub fn save_mlc_tsv_files(cred: &Credential, out_dir: &Path) -> Result<(), Box<dyn Error>> {
     let sftp = cred.open().unwrap();
     let Some(dir) = server::latest_dir(&sftp) else {
         return Err("Missing MLC dirs".into());
@@ -43,73 +44,8 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box
     Ok(())
 }
 
-// used if not trimming DB
-pub fn setup_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    log::info!("creating shares idx");
-    create_trim_shares_indexes(conn)?;
-    log::info!("creating resource pk");
-    create_share_pk(conn)?;
-
-    log::info!("creating resource pk");
-    create_resource_pk(conn)?;
-    log::info!("creating trim_works idx");
-    create_trim_works_indexes(conn)?;
-    log::info!("creating works pk");
-    create_work_pk(conn)?;
-
-    log::info!("creating releases idx");
-    create_trim_releases_indexes(conn)?;
-
-    log::info!("creating parties pk");
-    create_party_pk(conn)?;
-    log::info!("creating parties idx");
-    create_trim_parties_indexes(conn)?;
-    Ok(())
-}
-
-pub fn trim_db(conn: &Connection, vacuum: bool) -> Result<(), rusqlite::Error> {
-    trim::setup_trim_write_mode(conn)?;
-
-    log::info!("creating shares idx");
-    create_trim_shares_indexes(conn)?;
-    log::info!("creating resource pk");
-    create_share_pk(conn)?;
-    log::info!("starting to trim shares");
-    let count = trim::trim_shares(conn)?;
-    log::info!("trimmed {count} shares");
-
-    log::info!("creating resource pk");
-    create_resource_pk(conn)?;
-    log::info!("creating trim_works idx");
-    create_trim_works_indexes(conn)?;
-    log::info!("creating works pk");
-    create_work_pk(conn)?;
-    log::info!("starting to trim works");
-    let count = trim::trim_works(conn)?;
-    log::info!("trimmed {count} works");
-
-    log::info!("creating releases idx");
-    create_trim_releases_indexes(conn)?;
-    log::info!("starting to trim releases");
-    let count = trim::trim_releases(conn)?;
-    log::info!("trimmed {count} releases");
-
-    log::info!("creating parties pk");
-    create_party_pk(conn)?;
-    log::info!("creating parties idx");
-    create_trim_parties_indexes(conn)?;
-    log::info!("starting to trim parties");
-    let count = trim::trim_parties(conn)?;
-    log::info!("trimmed {count} parties");
-
-    if vacuum {
-        _ = conn.execute("VACUUM", params!())?;
-    }
-    Ok(())
-}
-
 /// migrate DB and save TSV files into db
-pub fn migrate_from_bwarm_dump(
+pub fn insert_tsv_files_to_db(
     conn: &mut Connection,
     bwarm_dir: &Path,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -124,96 +60,6 @@ pub fn migrate_from_bwarm_dump(
     save_object::<Work>(conn, bwarm_dir)?;
     save_object::<WorkResource>(conn, bwarm_dir)?;
     save_object::<Share>(conn, bwarm_dir)?;
-    Ok(())
-}
-
-/// add new tables and indexes
-pub fn create_relationship_indexes(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
-    // modify_parties_migration(conn)?;
-    log::info!("creating publisher relations");
-    PublisherRelations::migrate(conn)?;
-    log::info!("creating writer relations");
-    WriterRelations::migrate(conn)?;
-    log::info!("creating search index");
-    create_search_indexes(conn)?;
-    log::info!("creating party fts");
-    create_party_fts(conn)?;
-    log::info!("creating relation index");
-    create_relation_index(conn)?;
-    log::info!("finished indexes");
-    Ok(())
-}
-
-pub fn create_search_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    log::info!("creating publisher relation index");
-    create_publisher_relation_index(conn)?;
-    log::info!("creating party index");
-    create_party_indexes(conn)?;
-    log::info!("creating share index");
-    create_share_index(conn)?;
-    log::info!("creating relation index");
-    create_relation_index(conn)?;
-    log::info!("creating work index");
-    create_work_indexes(conn)?;
-    Ok(())
-}
-
-pub fn create_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    create_trim_shares_indexes(conn)?;
-    create_trim_works_indexes(conn)?;
-    create_trim_releases_indexes(conn)?;
-    create_trim_parties_indexes(conn)?;
-
-    Ok(())
-}
-
-pub fn create_trim_shares_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
-        params!(),
-    )?;
-    Ok(())
-}
-
-pub fn create_trim_works_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
-        params!(),
-    )?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource ON work_resources(work_id, resource_id);",
-            params!(),
-        )
-        ?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_resources_isrc_id ON resources(isrc, id);",
-        params!(),
-    )?;
-    Ok(())
-}
-
-pub fn create_trim_releases_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_resources_release_id_id ON resources(release_id, id);",
-        params!(),
-    )?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_work_resources_resource_id ON work_resources(resource_id);",
-        params!(),
-    )?;
-    Ok(())
-}
-
-pub fn create_trim_parties_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);",
-        params!(),
-    )?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
-        params!(),
-    )?;
     Ok(())
 }
 
@@ -385,159 +231,6 @@ pub fn enrich_writer_relations(conn: &rusqlite::Transaction) -> Result<(), rusql
           ON CONFLICT(writer_a, writer_b) DO UPDATE
           SET occurrences = occurrences + excluded.occurrences;
         ";
-    _ = conn.execute(sql, params!())?;
-    Ok(())
-}
-
-// ---------------------
-// TABLES
-
-struct PublisherRelations {
-    // pub parent_id: i64,
-    // pub child_id: i64,
-}
-
-impl PublisherRelations {
-    pub fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
-        let sql = "
-        CREATE TABLE IF NOT EXISTS publisher_relations (
-            parent_id INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-            child_id INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-            occurrences INTEGER NOT NULL DEFAULT 1,
-            PRIMARY KEY(parent_id, child_id)
-        )";
-        _ = conn.execute(sql, params!())?;
-        Ok(())
-    }
-}
-
-struct WriterRelations {
-    // pub writer_a: i64,
-    // pub writer_b: i64,
-}
-
-impl WriterRelations {
-    pub fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
-        let sql = "
-        CREATE TABLE IF NOT EXISTS writer_relations (
-            writer_a INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-            writer_b INTEGER NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-            occurrences INTEGER NOT NULL DEFAULT 1,
-            PRIMARY KEY(writer_a, writer_b)
-        )";
-        _ = conn.execute(sql, params!())?;
-        Ok(())
-    }
-}
-
-//---------------------------
-// INDEXES
-
-fn create_party_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let sql = "
-        CREATE INDEX IF NOT EXISTS idx_party_ipi ON parties(ipi);
-        ";
-    _ = conn.execute(sql, params!())?;
-    Ok(())
-}
-
-fn create_publisher_relation_index(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let sql = "
-        CREATE INDEX IF NOT EXISTS idx_publisher_relations_parent_occ
-        ON publisher_relations (parent_id, occurrences DESC);
-        ";
-    _ = conn.execute(sql, params!())?;
-    let sql = "
-        CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
-        ON publisher_relations (child_id, occurrences DESC);
-        ";
-    _ = conn.execute(sql, params!())?;
-    Ok(())
-}
-
-fn create_work_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let sql = "
-        CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource
-        ON work_resources(work_id, resource_id);
-        ";
-    _ = conn.execute(sql, params!())?;
-    Ok(())
-}
-
-fn create_relation_index(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let sql = "
-    CREATE INDEX IF NOT EXISTS idx_publisher_relations_child_occ
-    ON publisher_relations (child_id, occurrences DESC);
-        ";
-    _ = conn.execute(sql, params!())?;
-    Ok(())
-}
-
-fn create_share_index(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_party_id ON shares(party_id);",
-        params!(),
-    )?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_id ON shares(preceding_id);",
-        params!(),
-    )?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_preceding_party ON shares(preceding_id, party_id);",
-        params!(),
-    )?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_shares_work_preceeding_shares ON shares(work_id, preceding_id);",
-            params!(),
-        )
-        ?;
-    _ = conn.execute(
-        "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
-        params!(),
-    )?;
-
-    Ok(())
-}
-
-pub fn create_party_fts(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
-    let sql = "
-        CREATE VIRTUAL TABLE IF NOT EXISTS parties_fts USING fts5(
-            full_name,
-            content=parties,
-            content_rowid=id,
-            tokenize='unicode61'
-        );";
-    _ = conn.execute(sql, params!())?;
-
-    let sql = "
-        -- Populate from existing data
-        INSERT INTO parties_fts(rowid, full_name)
-        SELECT id, full_name FROM parties;";
-    _ = conn.execute(sql, params!())?;
-
-    let sql = "
-        CREATE TRIGGER IF NOT EXISTS parties_fts_insert AFTER INSERT ON parties BEGIN
-            INSERT INTO parties_fts(rowid, full_name) VALUES (new.id, new.full_name);
-        END;";
-    _ = conn.execute(sql, params!())?;
-
-    let sql = "
-        CREATE TRIGGER IF NOT EXISTS parties_fts_delete AFTER DELETE ON parties BEGIN
-            INSERT INTO parties_fts(parties_fts, rowid, full_name) VALUES ('delete', old.id, old.full_name);
-        END;";
-    _ = conn.execute(sql, params!())?;
-
-    let sql = "
-        CREATE TRIGGER IF NOT EXISTS parties_fts_update
-        AFTER UPDATE OF full_name ON parties
-        BEGIN
-          INSERT INTO parties_fts(parties_fts, rowid, full_name)
-          VALUES ('delete', old.id, old.full_name);
-
-          INSERT INTO parties_fts(rowid, full_name)
-          VALUES (new.id, new.full_name);
-        END;";
     _ = conn.execute(sql, params!())?;
     Ok(())
 }

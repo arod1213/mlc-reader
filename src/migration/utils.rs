@@ -1,25 +1,11 @@
 use std::{fs::File, path::Path};
 
-use rusqlite::{Connection, params};
+use rusqlite::Connection;
 
 use crate::bwarm::{
     interface::BwarmEntry, party::Party, release::Release, resource::Resource, share::Share,
     work_resource::WorkResource, works::Work,
 };
-
-pub fn disable_fk(conn: &Connection) -> Result<(), rusqlite::Error> {
-    _ = conn.execute("PRAGMA foreign_keys = OFF", params!())?;
-    Ok(())
-}
-
-pub fn setup_write_mode(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let mut stmt = conn.prepare("PRAGMA journal_mode = WAL")?;
-    let mut rows = stmt.query([])?;
-    while rows.next()?.is_some() {}
-
-    conn.execute("PRAGMA synchronous = NORMAL", params!())?;
-    Ok(())
-}
 
 pub fn save_object<'r, T>(
     conn: &mut Connection,
