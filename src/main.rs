@@ -1,6 +1,6 @@
 use clap::Parser;
 use dotenv::dotenv;
-use mlc_reader::migration::index::{create_relationship_indexes, setup_indexes};
+use mlc_reader::migration::index::{create_relationship_indexes, setup_indexes_and_pk};
 use mlc_reader::migration::setup::disable_fk;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use std::error::Error;
@@ -61,7 +61,7 @@ fn nightjob(
         RunStepConfig {
             step: RunStep::Indexes,
             f: &|db| {
-                setup_indexes(db)?;
+                setup_indexes_and_pk(db)?;
                 create_relationship_indexes(db)?;
                 Ok(())
             },
@@ -154,7 +154,7 @@ fn main() {
 
     let args = Args::parse();
     match args.command {
-        Command::Indexes {} => setup_indexes(&conn).expect("failed to create indexes"),
+        Command::Indexes {} => setup_indexes_and_pk(&conn).expect("failed to create indexes"),
         Command::Migrate { path } => {
             let conn = rusqlite::Connection::open(path).expect("failed to open db");
             migration::migrate_full_db(&conn).expect("failed to migrate");

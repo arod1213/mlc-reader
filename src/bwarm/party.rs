@@ -80,7 +80,7 @@ impl BwarmEntry for Party<'_> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let x = Party {
             id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
             isni: fields.get(1),
@@ -105,7 +105,7 @@ impl BwarmEntry for Party<'_> {
             x.first_name,
             x.last_name,
         ))?;
-        Ok(())
+        Ok(true)
     }
 
     fn migrate(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {

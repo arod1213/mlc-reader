@@ -372,9 +372,10 @@ pub fn search_works_by_title(
     let artist_condition = if artist.is_some() {
         "
         JOIN work_resources wr on wr.work_id = wk.id
-        JOIN resources rs on rs.id = wr.resource_id
+        JOIN resources rs on rs.id = wr.resource_id AND rs.release_id IS NOT NULL
         JOIN releases r on r.id = rs.release_id
-        WHERE r.artist_name = ?2
+        WHERE r.artist_name LIKE ?2 || '%' 
+            AND r.artist_name IS NOT NULL
         "
     } else {
         "WHERE ?2 is null"

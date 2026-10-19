@@ -11,7 +11,7 @@ use dotenv::dotenv;
 use mlc_reader::api::{
     self,
     party::{get_party, get_party_collaborators, get_party_ranks, get_party_works, search_parties},
-    work::{get_work, search_works_by_codes},
+    work::{get_work, search_works_by_codes, search_works_by_name},
 };
 use tower_http::cors::{Any, CorsLayer};
 
@@ -48,7 +48,10 @@ async fn main() {
     let api = Router::new()
         // find works by ISRCs or ISWCs
         .route("/works", post(search_works_by_codes))
+        // find works by title / artist name
+        .route("/works/name", get(search_works_by_name))
         // find top writers/publishers by total share / avg share / etc
+        // TODO: get assumed share on party here (writers collect 0 so it's misleading right now)
         .route("/works/top-parties", post(get_party_ranks))
         // get one work (with more info)
         .route("/work/{id}", get(get_work))

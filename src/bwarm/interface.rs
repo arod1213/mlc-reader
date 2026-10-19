@@ -10,5 +10,6 @@ pub trait BwarmEntry {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>>; // true if inserted, false if
+    // skipped
 }

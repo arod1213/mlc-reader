@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use axum::{
     Json,
-    extract::{Path, State},
+    extract::{Path, Query, State},
 };
 use rusqlite::OpenFlags;
 use serde::Deserialize;
@@ -26,6 +26,23 @@ pub async fn get_work(
     if works.is_empty() {
         return Err(ApiError::NotFound);
     }
+    Ok(Envelope::ok(works))
+}
+
+#[derive(Deserialize)]
+pub struct SearchWorksQuery {
+    pub title: String,
+    pub artist: Option<String>,
+}
+
+pub async fn search_works_by_name(
+    State(state): State<state::State>,
+    Query(query): Query<SearchWorksQuery>,
+) -> Result<Json<Envelope<Vec<WorkInfo>>>, ApiError> {
+    let conn =
+        rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+
+    let works = query::works::search_works_by_title(&conn, query.artist.as_deref(), &query.title)?;
     Ok(Envelope::ok(works))
 }
 

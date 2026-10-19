@@ -76,7 +76,7 @@ impl BwarmEntry for Resource<'_> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let release_id = match fields.get(11) {
             Some(x) => {
                 if x.is_empty() {
@@ -103,6 +103,6 @@ impl BwarmEntry for Resource<'_> {
             x.isrc,
             x.title,
         ))?;
-        Ok(())
+        Ok(true)
     }
 }

@@ -91,7 +91,7 @@ impl BwarmEntry for Work<'_> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let x = Work {
             id: fields.get(0).ok_or("missing id")?,
             iswc: fields.get(1),
@@ -112,6 +112,6 @@ impl BwarmEntry for Work<'_> {
             (x.is_arrangement as i64),
             x.territory,
         ))?;
-        Ok(())
+        Ok(true)
     }
 }

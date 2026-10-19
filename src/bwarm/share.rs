@@ -106,7 +106,7 @@ impl BwarmEntry for Share<'_> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let x = Share {
             id: fields.get(0).ok_or("missing id")?,
             work_id: fields.get(1).ok_or("missing work id")?,
@@ -127,6 +127,6 @@ impl BwarmEntry for Share<'_> {
             x.territory,
             x.preceding_id,
         ))?;
-        Ok(())
+        Ok(true)
     }
 }

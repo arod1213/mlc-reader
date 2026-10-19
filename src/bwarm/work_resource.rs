@@ -63,13 +63,13 @@ impl BwarmEntry for WorkResource<'_> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
         let x = WorkResource {
             id: fields.get(0).ok_or("missing id")?.parse::<u64>()?,
             work_id: fields.get(1).ok_or("missing work id")?,
             resource_id: fields.get(2).ok_or("missing resource id")?,
         };
         _ = stmt.execute(params!(x.id as i64, x.work_id, x.resource_id,))?;
-        Ok(())
+        Ok(true)
     }
 }

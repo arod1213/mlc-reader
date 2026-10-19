@@ -37,7 +37,8 @@ where
     for entry in rdr.records() {
         let entry = entry?;
         match T::insert_from_csv(&entry, &mut stmt) {
-            Ok(_) => {
+            Ok(false) => {} // skipped row
+            Ok(true) => {
                 sum += 1;
                 if sum % batch_size == 0 {
                     drop(stmt);

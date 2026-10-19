@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 pub struct Release<'a> {
     pub id: i64,
     pub title: &'a str,
-    pub artist_name: &'a str,
+    pub artist_name: Option<&'a str>,
     pub label_name: &'a str,
     pub release_date: Option<&'a str>,
     pub distro_name: &'a str,
@@ -41,8 +41,8 @@ impl<'a> BwarmEntry for Release<'a> {
         let sql = "
         CREATE TABLE IF NOT EXISTS releases (
             id INTEGER PRIMARY KEY NOT NULL,
-            title TEXT NOT NULL,
-            artist_name TEXT NOT NULL,
+            title TEXT,
+            artist_name TEXT,
             distro_name TEXT NOT NULL,
             -- UNIX Timestamp
             release_date INTEGER,
@@ -78,11 +78,20 @@ impl<'a> BwarmEntry for Release<'a> {
     fn insert_from_csv(
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    ) -> Result<bool, Box<dyn std::error::Error + Send + Sync>> {
+        let title = match fields.get(2) {
+            None | Some("") => return Ok(false), // skip missing titles
+            Some(x) => x,
+        };
+        let artist_name = match fields.get(5) {
+            None | Some("") => None,
+            Some(x) => Some(x),
+        };
+
         let x = Release {
             id: fields.get(0).ok_or("missing id")?.parse::<i64>()?,
-            title: fields.get(2).ok_or("missing title")?,
-            artist_name: fields.get(5).ok_or("missing artist name")?,
+            title,
+            artist_name,
             label_name: fields.get(7).ok_or("missing label name")?,
             release_date: fields.get(9),
             distro_name: fields.get(8).ok_or("missing distro name")?,
@@ -95,6 +104,6 @@ impl<'a> BwarmEntry for Release<'a> {
             x.release_date,
             x.label_name,
         ))?;
-        Ok(())
+        Ok(true)
     }
 }

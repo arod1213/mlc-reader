@@ -5,7 +5,7 @@ use crate::migration::{
 };
 use rusqlite::{Connection, params};
 
-pub fn setup_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+pub fn setup_indexes_and_pk(conn: &Connection) -> Result<(), rusqlite::Error> {
     setup::setup_trim_write_mode(conn)?;
 
     log::info!("creating shares idx");
@@ -59,6 +59,8 @@ pub fn create_search_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     create_relation_index(conn)?;
     log::info!("creating work index");
     create_work_indexes(conn)?;
+    log::info!("creating title indexes");
+    create_title_indexes(conn)?;
     Ok(())
 }
 
@@ -68,6 +70,18 @@ pub fn create_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     create_trim_releases_indexes(conn)?;
     create_trim_parties_indexes(conn)?;
 
+    Ok(())
+}
+
+fn create_title_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_works_title_nocase ON works(title COLLATE NOCASE)",
+        params!(),
+    )?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_releases_artist_name ON releases(artist_name);",
+        params!(),
+    )?;
     Ok(())
 }
 
@@ -84,9 +98,7 @@ pub fn create_trim_works_indexes(conn: &Connection) -> Result<(), rusqlite::Erro
         "CREATE INDEX IF NOT EXISTS idx_shares_work_party ON shares(work_id, party_id);",
         params!(),
     )?;
-    _ = conn
-        .execute(
-            "CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource ON work_resources(work_id, resource_id);",
+    _ = conn.execute("CREATE INDEX IF NOT EXISTS idx_work_resources_work_resource ON work_resources(work_id, resource_id);",
             params!(),
         )
         ?;
