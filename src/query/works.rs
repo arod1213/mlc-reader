@@ -60,6 +60,7 @@ pub fn get_party_works(
             WHERE s.party_id = ?1
             AND {with_id_clause}
             AND {in_dispute_clause}
+            ORDER BY wk.title ASC
             LIMIT ?4
             OFFSET ?5
         "
@@ -79,7 +80,7 @@ pub fn get_party_works(
         )?
         .collect::<Result<Vec<_>, _>>()?;
 
-    let mut works = get_works(db, work_ids.as_slice(), 1_000, params.is_deep)?;
+    let mut works = get_works(db, work_ids.as_slice(), 300, params.is_deep)?;
     works.sort_by(|x, y| x.title.cmp(&y.title));
     Ok(works)
 }
@@ -169,7 +170,7 @@ pub fn get_works<T: AsRef<str> + ToSql>(
         FROM works wk
         WHERE wk.id IN ({placeholders})
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
-        ORDER BY 2 ASC
+        ORDER BY 1 ASC
         "
     );
 
