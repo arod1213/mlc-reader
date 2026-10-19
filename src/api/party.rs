@@ -28,9 +28,15 @@ pub async fn get_party(
 }
 
 #[derive(Serialize)]
-pub struct PartyCollaborators {
+pub struct RepresentedParties {
     pub writers: Vec<Party>,
     pub publishers: Vec<Party>,
+}
+
+#[derive(Serialize)]
+pub struct PartyCollaborators {
+    pub represented: RepresentedParties,
+    pub collaborators: Vec<Party>,
 }
 
 pub async fn get_party_collaborators(
@@ -40,13 +46,17 @@ pub async fn get_party_collaborators(
     let conn =
         rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
-    let publishers = query::party::get_party_collaborators(&conn, id, true)?;
-    let writers = query::party::get_party_collaborators(&conn, id, false)?;
-    let collab = PartyCollaborators {
-        writers,
-        publishers,
+    let publishers = query::party::get_party_chain_of_title(&conn, id, true)?;
+    let writers = query::party::get_party_chain_of_title(&conn, id, false)?;
+    let collaborators = query::party::get_party_collaborators(&conn, id)?;
+    let res = PartyCollaborators {
+        represented: RepresentedParties {
+            writers,
+            publishers,
+        },
+        collaborators,
     };
-    Ok(Envelope::ok(collab))
+    Ok(Envelope::ok(res))
 }
 
 pub async fn get_party_works(

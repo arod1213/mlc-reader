@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize)]
 pub struct PartyMeta {
-    pub party_id: u64,
+    pub info: Party,
     pub isrcs: Vec<String>,
     pub num_works: usize,
     pub total_shares: f32,
@@ -120,7 +120,7 @@ pub struct Release {
     pub artist_name: String,
     pub label_name: String,
     pub distro_name: String,
-    pub isrc: Option<Isrc>,
+    pub isrc: Option<String>,
     pub release_date: Option<NaiveDate>,
 }
 

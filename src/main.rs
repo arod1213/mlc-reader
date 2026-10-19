@@ -1,7 +1,7 @@
 use clap::Parser;
 use dotenv::dotenv;
-use mlc_reader::migration::trim_db;
 use mlc_reader::migration::utils::disable_fk;
+use mlc_reader::migration::{setup_trim_indexes, trim_db};
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use std::error::Error;
 use std::fs::File;
@@ -46,6 +46,7 @@ fn nightjob(
     conn: &mut rusqlite::Connection,
     config: JobConfig,
     resume_step: Option<RunStep>,
+    step_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     let steps = [
         RunStepConfig {
@@ -64,13 +65,16 @@ fn nightjob(
             f: &|db| {
                 if config.should_trim {
                     trim_db(db, true)?;
+                } else {
+                    log::info!("skipping trim step: creatind IDX instead");
+                    setup_trim_indexes(db)?
                 }
                 Ok(())
             },
         },
         RunStepConfig {
             step: RunStep::IndexSearch,
-            f: &|db| Ok(migration::create_search_tables_indexes(db)?),
+            f: &|db| Ok(migration::create_relationship_indexes(db)?),
         },
         RunStepConfig {
             step: RunStep::EnrichWriter,
@@ -104,7 +108,7 @@ fn nightjob(
             f: &|db| {
                 disable_fk(db)?;
                 let tx = db.transaction()?;
-                migration::add_party_stats(&tx)?;
+                // migration::add_party_stats(&tx)?;
                 migration::enrich_work_totals(&tx)?;
                 Ok(tx.commit()?)
             },
@@ -122,13 +126,20 @@ fn nightjob(
             },
         },
     ];
+    let mut num_steps_run = 0;
     for step in steps {
         if resume_step.as_ref().is_some_and(|r| *r > step.step) {
             continue;
         }
 
-        log::info!("Running {}", step.step);
+        // do nothing if step count is 0
+        if step_count != 0 && num_steps_run >= step_count {
+            break;
+        }
+
+        log::info!("Running Step: {}", step.step);
         (step.f)(conn)?;
+        num_steps_run += 1;
     }
 
     Ok(())
@@ -153,11 +164,16 @@ fn main() {
 
     let args = Args::parse();
     match args.command {
+        Command::Indexes {} => setup_trim_indexes(&conn).expect("failed to create indexes"),
         Command::Migrate { path } => {
             let conn = rusqlite::Connection::open(path).expect("failed to open db");
             migration::migrate_full_db(&conn).expect("failed to migrate");
         }
-        Command::NightJob { resume_step, trim } => {
+        Command::NightJob {
+            resume_step,
+            trim,
+            step_count,
+        } => {
             let config = JobConfig {
                 tsv_dir,
                 update_path,
@@ -165,8 +181,10 @@ fn main() {
                 should_trim: trim,
             };
 
-            nightjob(&mut conn, config, resume_step).expect("NightJob failed");
+            nightjob(&mut conn, config, resume_step, step_count).expect("NightJob failed");
+            log::info!("promoting db to prod");
             promote_db(&temp_db_url, &prod_db_url).expect("failed to promote db");
+            log::info!("nightjob complete");
         }
     }
 }
@@ -180,6 +198,7 @@ struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    Indexes {},
     Migrate {
         #[arg(short, long)]
         path: PathBuf,
@@ -190,6 +209,9 @@ enum Command {
 
         #[arg(short, long)]
         resume_step: Option<RunStep>,
+
+        #[arg(short, long)]
+        step_count: usize,
     },
 }
 
@@ -197,6 +219,10 @@ fn promote_db(temp_path: &str, prod_path: &str) -> Result<(), Box<dyn Error>> {
     if temp_path == prod_path {
         return Ok(());
     }
+
+    // ensure db path exists
+    let prod_conn = rusqlite::Connection::open(prod_path)?;
+    drop(prod_conn);
 
     let temp = File::open(temp_path)?;
     let prod = File::open(prod_path)?;

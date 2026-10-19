@@ -22,7 +22,7 @@ pub async fn get_work(
     let conn =
         rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
-    let works = query::works::get_works(&conn, &[&id], true)?;
+    let works = query::works::get_works(&conn, &[&id], 1_000, true)?;
     if works.is_empty() {
         return Err(ApiError::NotFound);
     }

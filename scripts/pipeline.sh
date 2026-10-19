@@ -15,4 +15,4 @@ export RUST_LOG=debug
 mkdir -p "$SQLITE_TMPDIR"
 chmod 700 "$SQLITE_TMPDIR"
 
-$BIN night-job
+nohup $BIN night-job --resume-step schema > job.log 2>&1 &

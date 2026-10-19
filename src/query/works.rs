@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use chrono::NaiveDate;
 use musicmeta::tis::society::TisSocietyCode;
 use rusqlite::{ToSql, params, params_from_iter};
 use serde::Deserialize;
@@ -78,12 +79,79 @@ pub fn get_party_works(
         )?
         .collect::<Result<Vec<_>, _>>()?;
 
-    get_works(db, work_ids.as_slice(), params.is_deep)
+    get_works(db, work_ids.as_slice(), 1_000, params.is_deep)
+}
+
+fn get_releases<T: AsRef<str> + ToSql>(
+    db: &rusqlite::Connection,
+    work_ids: &[T],
+    limit: usize,
+) -> Result<HashMap<String, Vec<Release>>, rusqlite::Error> {
+    let placeholders = vec!["?"; work_ids.len()].join(", ");
+    let q = format!(
+        "SELECT
+            wk.id,
+            r.id,
+            r.title,
+            r.artist_name,
+            r.label_name,
+            r.distro_name,
+            rs.isrc,
+            strftime('%Y-%m-%d', r.release_date, 'unixepoch')
+        FROM releases r
+        JOIN resources rs on rs.release_id = r.id
+        JOIN work_resources wr on wr.resource_id = rs.id
+        JOIN works wk on wk.id = wr.work_id
+        WHERE wk.id IN ({placeholders})
+        AND r.title <> ''
+        AND r.artist_name <> ''
+        ORDER BY r.artist_name ASC
+        LIMIT ?
+        "
+    );
+
+    let mut stmt = db.prepare(&q)?;
+    let limit = limit as i64;
+    let p = params_from_iter(
+        work_ids
+            .iter()
+            .map(|id| id as &dyn ToSql)
+            .chain(std::iter::once(&limit as &dyn ToSql)),
+    );
+
+    let rows = stmt.query_map(p, |row| {
+        let work_id: String = row.get(0)?;
+        let r = Release {
+            id: row.get(1)?,
+            title: row.get(2)?,
+            artist_name: row.get(3)?,
+            label_name: row.get(4)?,
+            distro_name: row.get(5)?,
+            isrc: row.get(6)?,
+            release_date: row
+                .get::<_, Option<String>>(7)?
+                .and_then(|x| NaiveDate::parse_from_str(&x, "%Y-%m-%d").ok()),
+        };
+        Ok((work_id, r))
+    })?;
+
+    let release_by_work = rows.collect::<Result<Vec<_>, _>>()?;
+    let mut map: HashMap<String, Vec<Release>> = HashMap::new();
+    for (id, release) in release_by_work {
+        match map.get_mut(&id) {
+            Some(x) => x.push(release),
+            None => {
+                map.insert(id, vec![release]);
+            }
+        }
+    }
+    Ok(map)
 }
 
 pub fn get_works<T: AsRef<str> + ToSql>(
     db: &rusqlite::Connection,
     work_ids: &[T],
+    release_limit: usize,
     is_deep: bool,
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
     let placeholders = vec!["?"; work_ids.len()].join(", ");
@@ -95,27 +163,8 @@ pub fn get_works<T: AsRef<str> + ToSql>(
           wk.duration_ms,
           wk.iswc,
           wk.in_dispute,
-          wk.total_shares,
-          COALESCE(
-              json_group_array(
-                  CASE
-                      WHEN r.id IS NOT NULL THEN json_object(
-                        'id', r.id,
-                        'title', r.title,
-                        'artist_name', r.artist_name,
-                        'label_name', r.label_name,
-                        'distro_name', r.distro_name,
-                        'isrc', rs.isrc,
-                        'release_date', strftime('%Y-%m-%d', r.release_date, 'unixepoch')
-                      )
-                  END
-              ),
-              '[]'
-          ) AS releases
+          wk.total_shares
         FROM works wk
-        LEFT JOIN work_resources wr ON wr.work_id = wk.id
-        LEFT JOIN resources rs ON rs.id = wr.resource_id
-        LEFT JOIN releases r ON r.id = rs.release_id
         WHERE wk.id IN ({placeholders})
         GROUP BY wk.id, wk.title, wk.duration_ms, wk.iswc, wk.in_dispute
         "
@@ -131,10 +180,7 @@ pub fn get_works<T: AsRef<str> + ToSql>(
             in_dispute: row.get(4)?,
             parties: vec![],
             total_shares: row.get(5)?,
-            releases: row
-                .get::<_, Option<String>>(6)?
-                .and_then(|x| serde_json::from_str::<Vec<Release>>(&x).ok())
-                .unwrap_or_default(),
+            releases: vec![],
         };
         Ok((w.id.clone(), w))
     })?;
@@ -143,9 +189,11 @@ pub fn get_works<T: AsRef<str> + ToSql>(
 
     if is_deep {
         let work_ids: Vec<_> = works_by_id.keys().cloned().collect();
-        let mut parties_by_work = get_works_parties(db, work_ids.as_slice())?;
+        let mut releases_by_work = get_releases(db, &work_ids, release_limit)?;
+        let mut parties_by_work = get_works_parties(db, &work_ids)?;
         for (id, work) in works_by_id.iter_mut() {
             work.parties = parties_by_work.remove(id).unwrap_or_default();
+            work.releases = releases_by_work.remove(id).unwrap_or_default();
         }
     }
     Ok(works_by_id.into_values().collect())
@@ -361,4 +409,33 @@ pub fn search_works_by_title(
     })?;
 
     rows.collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::query::test_util::{assert_runs, empty_db};
+
+    #[test]
+    fn get_party_works_runs() {
+        for flag in [true, false] {
+            let q = PartyWorksQuery {
+                with_id: Some(123),
+                in_dispute: Some(true),
+                limit: 10,
+                page: 0,
+                is_deep: flag,
+            };
+            assert_runs(get_party_works(&empty_db(), 123, q));
+
+            let q = PartyWorksQuery {
+                with_id: None,
+                in_dispute: None,
+                limit: 10,
+                page: 0,
+                is_deep: flag,
+            };
+            assert_runs(get_party_works(&empty_db(), 123, q));
+        }
+    }
 }

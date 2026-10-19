@@ -29,7 +29,7 @@ where
     T: 'r + BwarmEntry,
 {
     let fullpath = bwarm_dir.join(T::filename());
-    log::debug!("about to save {:?}", fullpath);
+    log::info!("inserting {:?} to db", fullpath);
 
     let file = File::open(fullpath)?;
     let mut rdr = csv::ReaderBuilder::new()

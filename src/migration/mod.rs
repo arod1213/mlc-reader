@@ -19,7 +19,7 @@ pub mod utils;
 
 pub fn migrate_full_db(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     migrate_schema(conn)?;
-    create_search_tables_indexes(conn)?;
+    create_relationship_indexes(conn)?;
     migrate_party_stats_fields(conn)?;
     migrate_work_totals_fields(conn)?;
     Ok(())
@@ -40,6 +40,30 @@ pub fn save_remote_mlc_docs(cred: &Credential, out_dir: &Path) -> Result<(), Box
     server::save_doc::<Share>(&sftp, &dir, out_dir).expect("missing share file");
     server::save_doc::<Release>(&sftp, &dir, out_dir).expect("missing release file");
     server::save_doc::<Resource>(&sftp, &dir, out_dir).expect("missing resource file");
+    Ok(())
+}
+
+// used if not trimming DB
+pub fn setup_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
+    log::info!("creating shares idx");
+    create_trim_shares_indexes(conn)?;
+    log::info!("creating resource pk");
+    create_share_pk(conn)?;
+
+    log::info!("creating resource pk");
+    create_resource_pk(conn)?;
+    log::info!("creating trim_works idx");
+    create_trim_works_indexes(conn)?;
+    log::info!("creating works pk");
+    create_work_pk(conn)?;
+
+    log::info!("creating releases idx");
+    create_trim_releases_indexes(conn)?;
+
+    log::info!("creating parties pk");
+    create_party_pk(conn)?;
+    log::info!("creating parties idx");
+    create_trim_parties_indexes(conn)?;
     Ok(())
 }
 
@@ -104,7 +128,7 @@ pub fn migrate_from_bwarm_dump(
 }
 
 /// add new tables and indexes
-pub fn create_search_tables_indexes(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
+pub fn create_relationship_indexes(conn: &rusqlite::Connection) -> Result<(), rusqlite::Error> {
     // modify_parties_migration(conn)?;
     log::info!("creating publisher relations");
     PublisherRelations::migrate(conn)?;
@@ -139,6 +163,7 @@ pub fn create_trim_indexes(conn: &Connection) -> Result<(), rusqlite::Error> {
     create_trim_works_indexes(conn)?;
     create_trim_releases_indexes(conn)?;
     create_trim_parties_indexes(conn)?;
+
     Ok(())
 }
 
@@ -161,6 +186,10 @@ pub fn create_trim_works_indexes(conn: &Connection) -> Result<(), rusqlite::Erro
             params!(),
         )
         ?;
+    _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_resources_isrc_id ON resources(isrc, id);",
+        params!(),
+    )?;
     Ok(())
 }
 
@@ -191,34 +220,24 @@ pub fn create_trim_parties_indexes(conn: &Connection) -> Result<(), rusqlite::Er
 /// indicate whether a party is primarily a writer / publisher
 pub fn assign_roles(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
     let sql = "
-    WITH role_counts AS (
-        SELECT
-          id,
-          COALESCE(writer_count, 0) AS writer_count,
-          COALESCE(publisher_count, 0) AS publisher_count
-        FROM parties
-        LEFT JOIN (
-          SELECT child_id AS id, SUM(occurrences) AS writer_count
-          FROM publisher_relations
-          GROUP BY child_id
-    ) w USING (id)
-    LEFT JOIN (
-      SELECT parent_id AS id, SUM(occurrences) AS publisher_count
-      FROM publisher_relations
-      GROUP BY parent_id
-    ) p USING (id)
-    )
-    UPDATE parties
-    SET role = (
-    SELECT CASE
-      WHEN writer_count > publisher_count THEN 'writer'
-      WHEN writer_count < publisher_count THEN 'publisher'
-      WHEN writer_count = publisher_count AND writer_count > 0 THEN 'both'
-      ELSE NULL
-    END
-    FROM role_counts
-    WHERE role_counts.id = parties.id
-    );";
+        WITH counts AS (
+          SELECT
+            party_id,
+            SUM(role IN ('ComposerLyricist','Composer','Lyricist','Arranger',
+                         'SubLyricist','Adapter','Translator','SubArranger')) AS wc,
+            SUM(role IN ('OriginalPublisher','RightsAdministrator','SubPublisher',
+                         'SubstitutedPublisher')) AS pc
+          FROM shares NOT INDEXED
+          GROUP BY party_id
+        )
+        UPDATE parties SET role = CASE
+            WHEN c.wc > c.pc THEN 'writer'
+            WHEN c.wc < c.pc THEN 'publisher'
+            WHEN c.wc > 0    THEN 'both'
+          END
+        FROM counts c
+        WHERE c.party_id = parties.id
+    ";
     _ = conn.execute(sql, params!())?;
     Ok(())
 }
@@ -332,16 +351,20 @@ pub fn enrich_publisher_relations(conn: &rusqlite::Connection) -> Result<(), rus
 pub fn enrich_writer_relations(conn: &rusqlite::Transaction) -> Result<(), rusqlite::Error> {
     let sql = "
           WITH root_writer_shares AS (
-              SELECT DISTINCT
-                  s.work_id,
-                  s.party_id
-              FROM shares s
-              WHERE NOT EXISTS (
-                  SELECT 1
-                  FROM shares rs
-                  WHERE rs.work_id = s.work_id
-                    AND rs.preceding_id = s.id
-              )
+            SELECT DISTINCT
+                s.work_id,
+                s.party_id
+            FROM shares s NOT INDEXED
+            WHERE role IN (
+                'ComposerLyricist',
+                'Composer',
+                'Lyricist',
+                'Arranger',
+                'SubLyricist',
+                'Adapter',
+                'Translator',
+                'SubArranger'
+            )
           ),
           pairs AS (
             SELECT a.party_id writer_a, b.party_id writer_b

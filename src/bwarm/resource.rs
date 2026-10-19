@@ -8,7 +8,7 @@ use crate::bwarm::interface::BwarmEntry;
 pub struct Resource<'a> {
     pub id: &'a str,
     pub data_provider: &'a str,
-    pub release_id: u64,
+    pub release_id: Option<u64>,
     pub resource_type: &'a str,
     pub isrc: Option<&'a str>,
     pub title: &'a str,
@@ -44,7 +44,7 @@ impl BwarmEntry for Resource<'_> {
            -- id TEXT PRIMARY KEY NOT NULL,
            id TEXT NOT NULL,
            data_provider TEXT NOT NULL,
-           release_id INTEGER NOT NULL REFERENCES releases(id) ON DELETE CASCADE,
+           release_id INTEGER REFERENCES releases(id) ON DELETE CASCADE,
            isrc TEXT,
            title TEXT NOT NULL
         )";
@@ -77,10 +77,21 @@ impl BwarmEntry for Resource<'_> {
         fields: &StringRecord,
         stmt: &mut rusqlite::Statement,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let release_id = match fields.get(11) {
+            Some(x) => {
+                if x.is_empty() {
+                    None
+                } else {
+                    Some(x.parse::<u64>()?)
+                }
+            }
+            None => None,
+        };
+
         let x = Resource {
             id: fields.get(0).ok_or("missing id")?,
             data_provider: fields.get(14).ok_or("missing data provider")?,
-            release_id: fields.get(11).ok_or("missing release id")?.parse::<u64>()?,
+            release_id,
             resource_type: fields.get(1).ok_or("missing resource type")?,
             isrc: fields.get(2),
             title: fields.get(3).ok_or("missing title")?,
@@ -88,7 +99,7 @@ impl BwarmEntry for Resource<'_> {
         _ = stmt.execute(params!(
             x.id,
             x.data_provider,
-            x.release_id as i64,
+            x.release_id.map(|x| x as i64),
             x.isrc,
             x.title,
         ))?;
