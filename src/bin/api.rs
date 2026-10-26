@@ -71,6 +71,7 @@ async fn main() {
         .layer(cors);
 
     let listen_on = format!("0.0.0.0:{}", port);
+    println!("listening on {}", listen_on);
     let listener = tokio::net::TcpListener::bind(listen_on).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }

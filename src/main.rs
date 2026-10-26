@@ -2,6 +2,7 @@ use clap::Parser;
 use dotenv::dotenv;
 use mlc_reader::migration::index::{create_relationship_indexes, setup_indexes_and_pk};
 use mlc_reader::migration::setup::disable_fk;
+use mlc_reader::server;
 use mlc_reader::{migration, server::Credential, update_pro_affiliations};
 use std::error::Error;
 use std::fs::File;
@@ -142,8 +143,12 @@ fn main() {
     let cred = Credential {
         host: env::var("MLC_HOST").expect("missing MLC_HOST"),
         username: env::var("MLC_USER").expect("missing MLC_USER"),
-        public_key: env::var("MLC_PUBLIC_KEY").unwrap().into(),
-        private_key: env::var("MLC_PRIVATE_KEY").unwrap().into(),
+        public_key: env::var("MLC_PUBLIC_KEY")
+            .expect("missing MLC_PUBLIC_KEY")
+            .into(),
+        private_key: env::var("MLC_PRIVATE_KEY")
+            .expect("missing MLC_PRIVATE_KEY")
+            .into(),
     };
     let tsv_dir: PathBuf = env::var("TSV_DIR").expect("missing TSV_DIR").into();
     let update_path: PathBuf = env::var("UPDATE_PATH").expect("missing UPDATE_PATH").into();
@@ -154,6 +159,14 @@ fn main() {
 
     let args = Args::parse();
     match args.command {
+        Command::LatestDir {} => {
+            let sftp = cred.open().unwrap();
+            let Some(dir) = server::latest_dir(&sftp) else {
+                eprintln!("failed to get latest dir");
+                return;
+            };
+            println!("Latest Dir: {}", dir.display());
+        }
         Command::Indexes {} => setup_indexes_and_pk(&conn).expect("failed to create indexes"),
         Command::Migrate { path } => {
             let conn = rusqlite::Connection::open(path).expect("failed to open db");
@@ -186,6 +199,7 @@ struct Args {
 
 #[derive(clap::Subcommand)]
 enum Command {
+    LatestDir {},
     Indexes {},
     Migrate {
         #[arg(short, long)]
