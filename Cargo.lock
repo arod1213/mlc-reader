@@ -757,7 +757,7 @@ dependencies = [
 
 [[package]]
 name = "mlc-reader"
-version = "0.1.21"
+version = "0.1.22"
 dependencies = [
  "axum",
  "chrono",
@@ -797,8 +797,8 @@ dependencies = [
 
 [[package]]
 name = "musicmeta"
-version = "0.1.19"
-source = "git+https://github.com/arod1213/musicmeta.git#9c9f7051df94446d433d76627b246a786d5a1afd"
+version = "0.1.3"
+source = "git+ssh://git@github.com/arod1213/musicmeta.git#b974aa1512ee961cdedf3f5de01607976a043354"
 dependencies = [
  "num_enum",
  "schemars",

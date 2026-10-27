@@ -157,6 +157,10 @@ pub fn get_works<T: AsRef<str> + ToSql>(
     release_limit: usize,
     is_deep: bool,
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
+    if work_ids.len() == 0 {
+        return Ok(vec![]);
+    }
+
     let placeholders = vec!["?"; work_ids.len()].join(", ");
     let q = format!(
         "
@@ -296,6 +300,7 @@ pub fn search_works_by_isrcs<T: AsRef<str> + ToSql>(
         FROM matched_resources r
         JOIN work_resources wr ON wr.resource_id = r.id
         JOIN works wk on wk.id = wr.work_id
+        LIMIT 20000
         "
     );
 
@@ -341,6 +346,7 @@ pub fn search_works_by_iswcs<T: AsRef<str> + ToSql>(
         JOIN work_resources wr ON wr.resource_id = r.id
         FROM works wk
         WHERE wk.iswc IN ({placeholders})
+        LIMIT 20000
         "
     );
 
@@ -372,7 +378,10 @@ pub fn search_works_by_title(
     db: &rusqlite::Connection,
     artist: Option<&str>,
     title: &str,
+    page: usize,
 ) -> Result<Vec<WorkInfo>, rusqlite::Error> {
+    let limit = 500;
+    let offset = limit * page;
     let artist_condition = if artist.is_some() {
         "
         WHERE EXISTS (
@@ -400,11 +409,13 @@ pub fn search_works_by_title(
         FROM works wk
         {artist_condition}
         AND wk.title LIKE ?1
+        LIMIT ?3
+        OFFSET ?4
         "
     );
 
     let mut stmt = db.prepare(&q)?;
-    let rows = stmt.query_map(params![title, artist], |row| {
+    let rows = stmt.query_map(params![title, artist, limit as i64, offset as i64], |row| {
         Ok(WorkInfo {
             id: row.get(0)?,
             title: row.get(1)?,

@@ -1,9 +1,41 @@
-use std::str::FromStr;
+use std::{collections::HashSet, str::FromStr};
 
 use musicmeta::tis::society::TisSocietyCode;
-use rusqlite::{ToSql, params, params_from_iter};
+use rusqlite::{Connection, ToSql, params, params_from_iter};
 
 use crate::query::types::{Party, PartyInput, PartyMeta, Role};
+
+// pub fn party_bfs(db: &Connection, a_id: u64, b_id: u64) -> Option<Vec<u64>> {
+//     let Some(a_rel) = party_collabs(db, a_id) else {
+//         return None;
+//     }
+//     let Some(b_rel) = party_collabs(db, b_id) else {
+//         return None;
+//     }
+//     None
+// }
+
+// fn party_collabs(db: &Connection, id: u64) -> Option<HashSet<u64>> {
+//     let q = "
+//         SELECT writer_b
+//         FROM writer_relations
+//         WHERE writer_a = ?1
+//
+//         UNION
+//
+//         SELECT writer_a
+//         FROM writer_relations
+//         WHERE writer_b = ?1
+//     ";
+//     let mut stmt = db.prepare(q).ok()?;
+//     let rows = stmt
+//         .query_map(params!(id as i64), |row| {
+//             let id = row.get::<_, i64>(0)?;
+//             Ok(id as u64)
+//         })
+//         .ok()?;
+//     rows.collect::<Result<HashSet<u64>, _>>().ok()
+// }
 
 pub fn get_party(db: &rusqlite::Connection, id: u64) -> Result<Party, rusqlite::Error> {
     let q = "

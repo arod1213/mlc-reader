@@ -33,6 +33,8 @@ pub async fn get_work(
 pub struct SearchWorksQuery {
     pub title: String,
     pub artist: Option<String>,
+    #[serde(default)]
+    pub page: usize,
 }
 
 pub async fn search_works_by_name(
@@ -42,7 +44,12 @@ pub async fn search_works_by_name(
     let conn =
         rusqlite::Connection::open_with_flags(&state.db_url, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
 
-    let works = query::works::search_works_by_title(&conn, query.artist.as_deref(), &query.title)?;
+    let works = query::works::search_works_by_title(
+        &conn,
+        query.artist.as_deref(),
+        &query.title,
+        query.page,
+    )?;
     Ok(Envelope::ok(works))
 }
 
