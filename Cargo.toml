@@ -10,7 +10,7 @@ codegen-units = 1
 
 [package]
 name = "mlc-reader"
-version = "0.1.2"
+version = "0.1.21"
 edition = "2024"
 
 [dependencies]
@@ -30,4 +30,4 @@ env_logger = "0.11.10"
 log = "0.4.32"
 tower-http = { version = "0.7.1", features = ["cors"] }
 axum = { version = "0.8.9", features = ["macros", "multipart"] }
-rusqlite = "0.40.2"
+rusqlite = "^0.41"
